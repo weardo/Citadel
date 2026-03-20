@@ -64,7 +64,7 @@ One command. Say what you want. The system figures out the rest.
 /do overhaul all three services      → /fleet (parallel agents)
 ```
 
-**Four-tier classification**, each cheaper than the last:
+**Four-tier classification**, cheapest first:
 
 1. **Pattern Match** (~0 tokens) — Regex catches trivial commands
 2. **Active State** (~0 tokens) — Resumes in-progress campaigns
