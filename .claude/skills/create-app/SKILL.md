@@ -1,9 +1,9 @@
 ---
 name: create-app
 description: >-
-  End-to-end app creation from a single description. Four tiers: blank project,
-  guided, templated, or fully generated. Routes through PRD, architecture, and
-  Archon campaign with verification at every step.
+  End-to-end app creation from a single description. Five tiers: blank project,
+  guided, templated, fully generated, or feature addition to existing codebase.
+  Routes through PRD, architecture, and Archon campaign with verification at every step.
 user-invocable: true
 auto-trigger: false
 effort: max
@@ -24,7 +24,7 @@ verification, self-correction, and circuit breakers.
 
 ## Tier Detection
 
-Classify the user's input into one of four tiers:
+Classify the user's input into one of five tiers:
 
 ### Tier 1: Blank Project
 - Trigger: "create a blank project", "new project", "scaffold"
