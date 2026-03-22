@@ -185,6 +185,8 @@ function logBlock(hook, action, detail) {
 `;
     fs.appendFileSync(path.join(TELEMETRY_DIR, 'hook-errors.log'), line, 'utf8');
   } catch { /* telemetry should never break the hook */ }
+}
+
 // ── Input Validation ────────────────────────────────────────────────────────
 
 // Paths allow backslash (Windows path separator).
