@@ -7,7 +7,7 @@ description: >-
   into 3+ independent streams that can run simultaneously.
 user-invocable: true
 auto-trigger: false
-last-updated: 2026-03-20
+last-updated: 2026-03-21
 ---
 
 # /fleet — Parallel Coordinator
@@ -222,6 +222,114 @@ Also check `.planning/coordination/claims/` for external claims.
 - Discovery relay must be injected into subsequent waves
 - Merge conflicts must be resolved or explicitly recorded
 - Final typecheck must pass after all waves
+
+## Agent Timeouts
+
+Sub-agents can hang indefinitely on tool calls (e.g., WebFetch on a massive page).
+The circuit breaker catches tool *failures* but not tool *hangs*. Fleet must enforce
+execution time limits at the orchestrator level.
+
+### Default Timeouts
+
+| Agent Type | Default Timeout | Override Key |
+|---|---|---|
+| Skill-level agents | 10 minutes | `agentTimeouts.skill` |
+| Research scouts | 15 minutes | `agentTimeouts.research` |
+| Build agents | 30 minutes | `agentTimeouts.build` |
+
+Timeouts are configurable in `harness.json`:
+```json
+{
+  "agentTimeouts": {
+    "skill": 600000,
+    "research": 900000,
+    "build": 1800000
+  }
+}
+```
+
+### Timeout Protocol
+
+When spawning each agent, set the timeout on the Agent tool call. If an agent
+exceeds its timeout:
+
+1. **Log the timeout**: Record in telemetry with the agent's instance ID, assigned
+   scope, and elapsed time
+   ```bash
+   node scripts/telemetry-log.cjs --event agent-timeout --agent {instance-id} --session {session-slug} --meta '{"scope":"{scope}","elapsed_ms":{ms}}'
+   ```
+2. **Check for partial output**: Read the agent's output file. If it contains
+   a partial HANDOFF or usable findings, extract them.
+3. **Decide: retry or skip**:
+   - If this is Wave 1 and the agent's scope is critical → retry once with a
+     simplified prompt (remove WebFetch instructions, reduce scope)
+   - If this is a research scout → skip and proceed with other scouts' results
+   - If retry also times out → skip, log, and continue
+4. **Never block the wave**: One hung agent must not prevent other agents' results
+   from being processed. Collect results from completed agents and proceed.
+5. **Record in session file**: Add a `**Status:** timed out` entry for the agent
+   with the timeout duration and whether retry was attempted.
+
+### Reading Timeouts from Config
+
+```javascript
+const config = JSON.parse(fs.readFileSync('.claude/harness.json', 'utf8'));
+const timeouts = config.agentTimeouts || {};
+const skillTimeout = timeouts.skill || 600000;    // 10 min default
+const researchTimeout = timeouts.research || 900000; // 15 min default
+const buildTimeout = timeouts.build || 1800000;    // 30 min default
+```
+
+Match agent type to timeout based on the work queue's "Agent type" column.
+
+## Coordination Safety
+
+### Instance ID Generation
+
+Every agent spawned by Fleet must have a unique instance ID.
+
+Format: `fleet-{session-slug}-{wave}-{agent-index}`
+Example: `fleet-auth-refactor-w1-a3` (wave 1, agent 3)
+
+The instance ID is:
+- Written to the agent's worktree as `.fleet-instance-id`
+- Included in all telemetry log entries for this agent
+- Used in coordination claims to identify which agent owns which scope
+- Used in dead instance recovery to identify orphaned claims
+
+### Scope Overlap Detection
+
+Before spawning a wave, Fleet must validate that no two agents in the wave
+claim overlapping file scopes.
+
+Protocol:
+1. After decomposing tasks for the wave, extract each agent's file scope
+2. Compare all scopes pairwise:
+   - If Agent A's scope includes `src/auth/` and Agent B's scope includes `src/auth/login.ts`,
+     that's an overlap
+   - Directory scopes overlap with any file scope inside that directory
+3. If overlap detected:
+   - Option 1: Merge the overlapping tasks into one agent
+   - Option 2: Narrow scopes so they don't overlap
+   - Option 3: Sequence them (agent B waits for agent A to merge first)
+4. NEVER proceed with overlapping scopes. This is a hard gate.
+
+### Dead Instance Recovery
+
+After each wave completes, Fleet must check for orphaned claims.
+
+Protocol:
+1. Read all claim files in `.planning/coordination/claims/`
+2. For each claim, check if the claiming instance is still alive:
+   - Does the worktree still exist?
+   - Did the agent complete (check for HANDOFF or completion signal)?
+3. If an instance is dead but its claim still exists:
+   - Log a warning: "Dead instance {id} left orphaned claim on {scope}"
+   - Release the claim (delete the claim file)
+   - Add the uncompleted work back to the task queue for the next wave
+4. Run this check:
+   - After every wave completes
+   - Before spawning a new wave (clear stale claims first)
 
 ## Exit Protocol
 

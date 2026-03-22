@@ -228,11 +228,16 @@ verify the work and take next steps.}
    that becomes an explicit prohibition in the protocol. Taste preferences
    are as important as functional requirements.
 
-### Step 4: INSTALL — Place the File
+### Step 4: INSTALL & REGISTER — Place the File
 
 1. Create the directory: `.claude/skills/{name}/`
 2. Write the SKILL.md file to `.claude/skills/{name}/SKILL.md`
 3. Verify the file exists and is readable
+4. **Register with the router:**
+   a. Read `.claude/harness.json` (create if missing with `{}`)
+   b. Add the skill name to the `registeredSkills` array (if not already present)
+   c. Update `registeredSkillCount` to match the array length
+   d. This ensures `/do` routes to the new skill immediately without waiting for `/do setup`
 
 If the project has a CLAUDE.md that lists skills or references a skill
 directory, check whether the new skill should be mentioned there. Do not

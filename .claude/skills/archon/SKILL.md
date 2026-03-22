@@ -7,7 +7,7 @@ description: >-
   state, quality judgment, and strategic decomposition.
 user-invocable: true
 auto-trigger: false
-last-updated: 2026-03-20
+last-updated: 2026-03-21
 ---
 
 # /archon — Autonomous Strategist
@@ -92,16 +92,80 @@ For each phase:
    - Mark the phase complete/partial/failed
    - Add entries to the Feature Ledger
    - Log any decisions to the Decision Log
-7. **Continue**: Move to the next phase
+7. **Self-correct**: Run applicable checks from Step 4:
+   - Quality spot-check (every phase)
+   - Direction alignment (every 2nd phase)
+   - Regression guard (build phases only)
+   - Anti-pattern scan (build phases only)
+8. **Continue**: Move to the next phase
 
-### Step 4: VERIFY (after build phases)
+### Step 4: SELF-CORRECTION (Mandatory)
+
+These checks run automatically during campaign execution. They are not optional.
+
+#### Direction Alignment Check (every 2 phases)
+
+After completing every 2nd phase:
+
+1. Re-read the campaign's original Direction field
+2. Compare it to the Feature Ledger (what was actually built)
+3. Ask: "Is what I've built still serving the original direction?"
+4. If YES: continue. Log "Direction check: aligned" in Active Context.
+5. If NO: stop the current phase. Write a Decision Log entry:
+   - What drifted and why
+   - Whether to course-correct (adjust remaining phases) or park
+     (direction fundamentally changed)
+   - If course-correcting: rewrite remaining phases to re-align
+
+This catches **Scope Truncation** — when an agent builds phases 1-3 correctly
+but silently drops the hard parts in phases 4-6.
+
+#### Quality Spot-Check (every phase)
+
+After each phase completes:
+
+1. Look at the most significant output of the phase (the largest file changed,
+   the new component, the refactored module)
+2. Read it. Does it meet the project's quality bar?
+   - TypeScript strict mode? Types correct, not `any`-heavy?
+   - Clean structure? Not a 500-line monolith?
+   - Follows project conventions from CLAUDE.md?
+3. If view files (.tsx, .jsx, .vue, .svelte, .html) were modified, invoke
+   /live-preview to verify components render correctly
+4. If quality is acceptable: continue
+5. If quality is below bar: add a remediation task to the current phase
+   before marking complete
+
+#### Regression Guard (every build phase)
+
+After each build phase:
+
+1. Run the project's typecheck command
+2. Compare error count to the campaign's baseline (recorded at campaign creation)
+3. Escalation ladder:
+   - 1-2 new errors: fix them before continuing
+   - 3-4 new errors: log a warning, attempt fixes, continue if resolved
+   - 5+ new errors: PARK the campaign. Something went structurally wrong.
+4. If test suite exists: run it. Any new failures trigger the same escalation.
+
+#### Anti-Pattern Scan (every build phase)
+
+After each build phase, scan modified files for:
+- `transition-all` (should name specific properties)
+- `confirm()`, `alert()`, `prompt()` (should use in-app components)
+- Missing Escape key handlers in modals/overlays
+- Hardcoded values that should be constants
+
+If any found: fix before marking the phase complete.
+
+### Step 5: VERIFY (after build phases)
 
 1. Run the project's typecheck command
 2. Run the project's test suite if configured
 3. Verify that changes don't break existing functionality
 4. If verification fails: record the failure, decide whether to fix or skip
 
-### Step 5: CONTINUATION (before context runs low)
+### Step 6: CONTINUATION (before context runs low)
 
 If you're running low on context or finishing a session:
 
@@ -113,7 +177,7 @@ If you're running low on context or finishing a session:
    - What should happen next
 3. The next Archon invocation will read this and pick up where you left off
 
-### Step 6: COMPLETION
+### Step 7: COMPLETION
 
 When all phases are done:
 
@@ -134,7 +198,11 @@ When invoked without direction:
 1. Check `.planning/intake/` for pending items → suggest processing them
 2. Check for active campaigns → suggest continuing
 3. Check for recently completed campaigns → suggest verification
-4. If nothing: "No active work. Give me a direction or run `/do status`."
+4. Run typecheck and count errors — if type errors are climbing compared to
+   last campaign, suggest a "fix type errors" campaign
+5. Check `.planning/campaigns/completed/` count — if 3+ completed campaigns
+   exist, suggest archival/cleanup
+6. If nothing: "No active work. Give me a direction or run `/do status`."
 
 ## Quality Gates
 
@@ -143,6 +211,20 @@ When invoked without direction:
 - Sub-agents must receive full context injection (CLAUDE.md + rules-summary)
 - Never re-delegate the same failing work without changing the approach
 - Continuation State must be written before context runs low
+- Direction alignment must pass every 2 phases (Step 4)
+- Quality spot-check must pass every phase (Step 4)
+- Regression guard must pass every build phase (Step 4)
+
+## Circuit Breakers
+
+Park the campaign when:
+
+- 3+ consecutive failures on the same approach
+- Fundamental architectural conflict discovered
+- Quality bar cannot be met (quality spot-check fails 3 times in a row)
+- Direction drift detected (2 consecutive alignment check failures)
+- Typecheck introduces 5+ new errors in a single phase
+- Build introduces regressions in existing tests
 
 ## Exit Protocol
 

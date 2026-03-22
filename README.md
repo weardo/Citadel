@@ -4,109 +4,38 @@
 [![Node.js 18+](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-compatible-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
 
-An agent orchestration system for [Claude Code](https://claude.ai/claude-code). Route any task through the right tool at the right scale — from a one-line fix to a multi-day parallel campaign.
+Run autonomous coding campaigns with Claude Code. Route any task through the right tool at the right scale — from a one-line fix to a multi-day parallel campaign.
 
-**13 skills | 3 autonomous agents | 8 lifecycle hooks | campaign persistence | fleet coordination | telemetry**
+**18 skills | 3 autonomous agents | 8 lifecycle hooks | campaign persistence | fleet coordination**
 
-Built from running 198 autonomous agents across 32 fleet sessions on a production codebase. 27 postmortems worth of lessons baked into every hook and skill.
+## Quickstart
 
-**The harness is simple. The knowledge that shaped it isn't.**
+**Prerequisites:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) + [Node.js 18+](https://nodejs.org/)
 
-# Quickstart
-
-From install to first `/do` command in 5 minutes.
-
-## Prerequisites
-
-* **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — the CLI tool this harness extends
-* **[Node.js 18+](https://nodejs.org/)** — required for hooks and scripts
-
-## 1. Copy the harness into your project
-
-### macOS / Linux
 ```bash
+# 1. Clone and copy into your project
 git clone https://github.com/SethGammon/Citadel.git
-cd your-project
+cp -r Citadel/.claude Citadel/.planning Citadel/scripts your-project/
 
-cp -r ../Citadel/.claude .
-cp -r ../Citadel/.planning .
-cp -r ../Citadel/scripts .
-
-# If you don't have a CLAUDE.md yet, copy the starter
-cp ../Citadel/CLAUDE.md .
-```
-
-### Windows (Command Prompt)
-```cmd
-git clone https://github.com/SethGammon/Citadel.git
-cd your-project
-
-xcopy /E /I ..\Citadel\.claude .\.claude
-xcopy /E /I ..\Citadel\.planning .\.planning
-xcopy /E /I ..\Citadel\scripts .\scripts
-xcopy ..\Citadel\CLAUDE.md .\CLAUDE.md*
-```
-
-### Windows (PowerShell)
-```powershell
-git clone https://github.com/SethGammon/Citadel.git
-cd your-project
-
-Copy-Item -Recurse ..\Citadel\.claude .\.claude
-Copy-Item -Recurse ..\Citadel\.planning .\.planning
-Copy-Item -Recurse ..\Citadel\scripts .\scripts
-Copy-Item ..\Citadel\CLAUDE.md .\CLAUDE.md
-```
-
-> **Note:** If your project already has a `.gitignore`, append the entries from the harness `.gitignore` rather than overwriting yours.
-
-Or copy manually — the harness is just files, no build step.
-
-## 2. Run setup
-
-Open your project in Claude Code (`cd your-project && claude`), then:
-```
+# 2. Run setup (inside Claude Code)
 /do setup
+
+# 3. Try something
+/do review src/main.ts
 ```
 
-This will:
+That's it. [Full install guide →](QUICKSTART.md)
 
-* Detect your language and framework
-* Configure the typecheck hook for your stack
-* Generate `.claude/harness.json` with your settings
-* Create the planning directory structure
-* Run a quick demo on your code
+## Try These First
 
-## 3. Start using it
 ```
-/do review src/main.ts          # Code review
-/do generate tests for utils    # Test generation
-/do refactor the auth module    # Safe refactoring
-/do scaffold a new API module   # Project-aware scaffolding
+/do fix the typo on line 42        # Direct edit, zero overhead
+/do review the auth module         # 5-pass structured code review
+/do why is the API returning 500   # Root cause analysis
+/do build a caching layer          # Multi-step orchestrated build
 ```
 
-Or let the router figure it out:
-```
-/do fix the login bug
-/do what's wrong with the API
-/do build a caching layer
-```
-
-## 4. Create your first custom skill
-```
-/create-skill
-```
-
-It'll ask what patterns you keep repeating and generate a skill file
-that captures your knowledge permanently.
-
-## What's Next
-
-* Add your project's conventions to `CLAUDE.md` — the more specific, the better
-* Read `docs/SKILLS.md` to understand how skills work
-* Try `/marshal "audit the codebase"` for a multi-step investigation
-* Try `/archon "build [large feature]"` for multi-session campaigns
-* Try `/fleet "overhaul all three modules"` for parallel execution
+Say what you want. `/do` routes it to the cheapest tool that can handle it.
 
 ## The Orchestration Ladder
 
@@ -131,238 +60,82 @@ Four tiers. Use the cheapest one that fits.
 </tr>
 </table>
 
----
+## Skills (18)
 
-## The `/do` Router
-
-One command. Say what you want. The system figures out the rest.
-
-```
-/do fix the typo on line 42          → Direct edit (0 tokens)
-/do review the auth module           → /review skill
-/do build a caching layer            → /marshal (multi-step)
-/do finish the API redesign          → /archon (multi-session campaign)
-/do overhaul all three services      → /fleet (parallel agents)
-```
-
-**Four-tier classification**, cheapest first:
-
-1. **Pattern Match** (~0 tokens) — Regex catches trivial commands
-2. **Active State** (~0 tokens) — Resumes in-progress campaigns
-3. **Skill Keywords** (~0 tokens) — Matches against installed skills
-4. **LLM Classifier** (~500 tokens) — Structured complexity analysis
-
-The router biases toward under-routing. It's cheaper to re-invoke than to waste 100K tokens on a typo fix.
-
-**Commands:**
-
-| Command | What It Does |
-|---|---|
-| `/do [anything]` | Route to the right tool |
-| `/do status` | Show active campaigns, sessions, pending work |
-| `/do continue` | Resume where you left off |
-| `/do --list` | Show all installed skills |
-| `/do setup` | First-run configuration |
-
-**Escape hatches:** Direct invocation (`/marshal`, `/archon`, `/fleet`, `/review`) always bypasses the router.
-
----
-
-## Built-In Skills (6)
-
+### Core (6)
 | Skill | What It Does | Invoke |
 |---|---|---|
-| **Code Review** | 5-pass structured review: correctness, security, performance, readability, consistency. Every finding cites a specific line. | `/review` |
-| **Test Generation** | Generates tests that actually run. Detects your test framework, covers happy path + edge cases + error paths. Iterates up to 3x if tests fail. | `/test-gen` |
-| **Documentation** | Three modes: function-level docstrings, module READMEs, API reference. Matches your existing doc style. | `/doc-gen` |
-| **Refactoring** | Safe multi-file refactoring. Typechecks before AND after. If tests fail, reverts and reports. Handles import path updates. | `/refactor` |
-| **Scaffolding** | Project-aware file generation. Reads your existing structure and matches it. Generates wiring, exports, tests. | `/scaffold` |
-| **Skill Creator** | Creates new skills from your patterns. Asks what you keep repeating, what mistakes happen, produces a complete skill file. | `/create-skill` |
+| Code Review | 5-pass structured review (correctness, security, performance, readability, consistency) | `/review` |
+| Test Generation | Generates tests that run. Detects your framework, iterates up to 3x on failures. | `/test-gen` |
+| Documentation | Function-level, module-level, or API reference. Matches your doc style. | `/doc-gen` |
+| Refactoring | Safe multi-file refactoring. Typechecks before and after. Reverts on failure. | `/refactor` |
+| Scaffolding | Project-aware file generation. Reads your conventions and matches them. | `/scaffold` |
+| Skill Creator | Creates new skills from your repeating patterns. | `/create-skill` |
 
-These are not skeletons. Each produces real, substantive output on any codebase.
+### Research & Debugging (4)
+| Skill | What It Does | Invoke |
+|---|---|---|
+| Research | Structured investigation with confidence levels and sources | `/research` |
+| Research Fleet | Parallel multi-scout research with wave compression | `/research-fleet` |
+| Experiment | Optimization loops with scalar fitness functions in isolated worktrees | `/experiment` |
+| Systematic Debugging | 4-phase root cause analysis. Emergency stop after 2 failed fixes. | `/systematic-debugging` |
 
----
+### Orchestration (5)
+| Skill | What It Does | Invoke |
+|---|---|---|
+| `/do` | Universal router — classifies intent and dispatches to cheapest capable path | `/do [anything]` |
+| Marshal | Single-session orchestrator. Chains skills autonomously. | `/marshal` |
+| Archon | Multi-session campaigns with self-correction and quality gates | `/archon` |
+| Fleet | Parallel agents with discovery sharing and coordination safety | `/fleet` |
+| Autopilot | Intake-to-delivery pipeline for pending work items | `/autopilot` |
 
-## Hooks (8 Lifecycle Events)
+### Utilities (3)
+| Skill | What It Does | Invoke |
+|---|---|---|
+| Live Preview | Mid-build visual verification via screenshots | `/live-preview` |
+| Session Handoff | Context transfer between sessions | `/session-handoff` |
+| Setup | First-run harness configuration | `/do setup` |
+
+## Hooks (8)
 
 Automated quality enforcement that runs without you thinking about it.
 
 | Hook | When | What It Does |
 |---|---|---|
-| Per-file typecheck | Every edit | Catches type errors at write-time, not build-time |
+| Per-file typecheck | Every edit | Catches type errors at write-time |
 | Circuit breaker | Tool failure | After 3 failures: "try a different approach" |
 | Quality gate | Session end | Scans for anti-patterns in modified files |
 | Intake scanner | Session start | Reports pending work items |
-| File protection | Before edit | Blocks edits to protected files |
+| File protection | Before edit/read | Blocks edits to protected files, blocks reads on .env secrets |
 | Context preservation | Before/after compaction | Saves and restores session state |
 | Worktree setup | Agent spawn | Auto-installs deps in parallel agent worktrees |
 
-**Language-adaptive:** The typecheck hook detects your stack (TypeScript, Python, Go, Rust) and runs the right checker.
-
-**Configurable:** Add custom quality rules in `harness.json`. See [docs/HOOKS.md](docs/HOOKS.md).
-
----
-
 ## Campaign Persistence
 
-Work that survives across sessions.
+Work survives across sessions. Close the terminal, come back tomorrow, `/do continue` picks up where you left off.
 
-```markdown
-# Campaign: API Auth Overhaul
-
-Status: active
-Direction: "Replace basic auth with JWT"
-
-## Phases
-1. [complete] Research: audit existing auth
-2. [in-progress] Build: JWT middleware
-3. [pending] Wire: connect to routes
-
-## Feature Ledger
-| Feature | Status | Phase |
-|---------|--------|-------|
-| JWT middleware | complete | 2 |
-
-## Decision Log
-- Chose jose over jsonwebtoken (ESM native, better types)
-
-## Active Context
-Building refresh token endpoint. Middleware done.
-
-## Continuation State
-Phase: 2, Sub-step: refresh endpoint
-```
-
-Close the session. Come back tomorrow. `/do continue` picks up exactly where you left off.
-
-See [docs/CAMPAIGNS.md](docs/CAMPAIGNS.md) and [examples/campaign-example.md](examples/campaign-example.md).
-
----
+Campaigns track phases, decisions, feature status, and continuation state in markdown files. See [docs/CAMPAIGNS.md](docs/CAMPAIGNS.md).
 
 ## Fleet Parallelism
 
-Run multiple agents simultaneously with discovery sharing.
-
-```
-Wave 1: Agent A (src/api/) + Agent B (src/ui/)
-  ← Compress discoveries: "API uses jose for JWT, 15min expiry"
-  ← Merge branches
-
-Wave 2: Agent C (integration) ← starts with Wave 1's knowledge
-  ← Builds refresh logic knowing the token expiry
-```
-
-Agents run in isolated git worktrees. Dependencies auto-installed. Discovery briefs (~500 tokens each) relay knowledge between waves.
-
-See [docs/FLEET.md](docs/FLEET.md).
-
----
-
-## Writing Your Own Skills
-
-The harness ships with 6 skills. You'll want more.
-
-```
-/create-skill
-```
-
-This interviews you about patterns you keep repeating and generates a complete skill file. Every skill you create follows the standard format, making the format the standard by adoption.
-
-Or write one manually — it's just a markdown file with 5 sections:
-
-```markdown
-## Identity      ← Who is this skill?
-## Orientation   ← When to use it?
-## Protocol      ← Step-by-step instructions
-## Quality Gates ← What must be true when done?
-## Exit Protocol ← What to output?
-```
-
-See [docs/SKILLS.md](docs/SKILLS.md) for the full guide.
-
----
-
-## Project Structure
-
-```
-.claude/
-  settings.json           Hook lifecycle configuration
-  harness.json            Project config (generated by /do setup)
-  hooks/                  8 lifecycle hooks
-  skills/                 Skill protocols (6 built-in + your own)
-  agents/                 Agent definitions (archon, fleet, etc.)
-  agent-context/          Context injected into sub-agents
-
-.planning/
-  intake/                 Work items pending processing
-  campaigns/              Active + completed campaign files
-  fleet/                  Fleet session state + discovery briefs
-  coordination/           Multi-instance scope claims
-  telemetry/              Agent run + hook timing logs
-
-scripts/
-  coordination.js         Multi-instance coordination CLI
-  compress-discovery.cjs  Discovery brief compression
-  telemetry-log.cjs       Agent and campaign event logging
-  telemetry-report.cjs    Performance summaries
-```
-
----
-
-## Telemetry & Cost Tracking
-
-The harness logs agent events, hook timing, and discovery compression to `.planning/telemetry/` (JSONL format, never leaves your machine).
-
-```bash
-npm run telemetry:report           # Agent run summary
-npm run telemetry:report -- --hooks       # Hook timing averages
-npm run telemetry:report -- --compression # Discovery compression ratios
-```
-
-Archon and Fleet log campaign start/complete, wave events, and per-agent results automatically. Hooks log their own timing on every invocation.
-
-Token counts are logged when available. Claude Code doesn't currently surface per-session token usage to hooks, so cost tracking depends on your plan's usage dashboard.
-
----
-
-## When to Use Citadel
-
-Citadel scales down to a typo fix and up to a multi-day parallel campaign. You don't need to use every tier. Most tasks route to a Skill or Marshal automatically. Archon and Fleet are there when your project grows into them.
-
-If you're just starting with Claude Code and don't have a project yet, start with the basics first and come back when you're ready for structure. If you already have a codebase and want your agent to work smarter — even on simple tasks — install Citadel and let `/do` handle the routing.
-
----
-
-## Relationship to Superpowers
-
-[Superpowers](https://github.com/obra/superpowers) teaches your agent good methodology — brainstorm before coding, write tests first, review before shipping. Citadel gives it the infrastructure to execute that methodology at scale: campaign persistence across sessions, fleet coordination across parallel agents, lifecycle hooks that enforce quality automatically, and telemetry that tracks what happened. They are complementary. Use Superpowers for the workflow discipline. Use Citadel when your work outgrows a single session.
-
----
+Run 2-3 agents simultaneously in isolated worktrees. Discoveries compress into ~500-token briefs and relay between waves. See [docs/FLEET.md](docs/FLEET.md).
 
 ## FAQ
 
-**How is this different from just using CLAUDE.md?**
+**How is this different from CLAUDE.md?** — CLAUDE.md tells Claude about your project. The harness tells Claude *how to work*: routing, persistence, quality enforcement, parallel coordination.
 
-CLAUDE.md tells Claude about your project. The harness tells Claude *how to work* — routing decisions through the right tool, persisting state across sessions, enforcing quality through hooks, and coordinating parallel agents. CLAUDE.md is one piece. The harness is the operating system around it.
+**How much does it cost in tokens?** — Skills cost zero when not loaded. The `/do` router costs ~500 tokens only at Tier 3. Hooks add ~100 tokens per edit. The main cost is the work itself.
 
-**How much does this cost in tokens?**
+**Can I use this with other AI tools?** — Designed for Claude Code specifically. The concepts are portable but the implementation uses Claude Code's extension points.
 
-Skills cost zero tokens when not loaded — they're on-demand. The `/do` router costs ~500 tokens only when it needs Tier 3 classification (most requests resolve at Tier 0-2 for free). Hooks add minimal overhead (~100 tokens per edit for typecheck feedback). The main cost is the work itself, which you'd pay regardless.
+## Learn More
 
-**Can I use this with other AI coding tools?**
-
-The harness is designed for Claude Code specifically. The skills, hooks, and agent definitions use Claude Code's extension points. The *concepts* (campaign files, quality gates, discovery relay) are portable, but the implementation assumes Claude Code.
-
-**What's the difference between a skill and an agent?**
-
-Skills load instructions into the current Claude session (no new process). Agents spawn a new Claude process with its own context window. Skills are cheap and fast. Agents are expensive but isolated.
-
----
+- [Full install guide](QUICKSTART.md)
+- [Skills reference](docs/SKILLS.md)
+- [Hooks reference](docs/HOOKS.md)
+- [Campaign guide](docs/CAMPAIGNS.md)
+- [Fleet guide](docs/FLEET.md)
 
 ## License
 
 MIT
-
-## Author
-
-Built while managing a 668K-line codebase solo. The harness is the distillation of what actually works when you run agents at scale.

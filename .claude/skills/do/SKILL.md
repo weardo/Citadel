@@ -39,6 +39,28 @@ under-routing (skill fails, user re-invokes) is far cheaper than over-routing
 
 Classification runs top-to-bottom. First match wins. Each tier is cheaper than the next.
 
+### Step 0: Skill Registry Check (Cost: ~0 on hit | ~50 tokens on miss)
+
+Before routing, check if new skills have been added since last registration.
+
+1. Count directories in `.claude/skills/`
+2. Read `registeredSkillCount` from `.claude/harness.json`
+3. **If counts match**: continue to Tier 0. Zero cost.
+4. **If counts differ** (or harness.json doesn't exist yet):
+   a. Read the `registeredSkills` array from harness.json (default: `[]`)
+   b. Diff directory names against the registered list
+   c. For each unknown skill: read ONLY lines 1-10 of its `SKILL.md` (frontmatter)
+   d. Extract `name` and `description` from frontmatter
+   e. Add the skill to the Tier 2 keyword table for this session using its
+      `name` and `description` words as match targets
+   f. Log to the user: `"Discovered {N} new skill(s): {names}. Run /do setup to permanently register routing keywords."`
+   g. Update `registeredSkillCount` and `registeredSkills` array in harness.json
+
+**This means:**
+- 99% of invocations: one number comparison, zero file reads
+- New skill dropped in: reads only the new frontmatter, routes immediately
+- `/do setup` does a full registry rebuild with permanent keyword assignment
+
 ### Tier 0: Pattern Match (Cost: ~0 tokens | Latency: <1ms)
 
 Regex/keyword on raw input. Catches trivial commands:
@@ -90,6 +112,11 @@ frontmatter for name and description.
 | "parallel", "simultaneous", "multiple agents" | `/fleet` |
 | "intake", "process pending", "pipeline" | `/autopilot` |
 | "setup", "first run", "configure harness" | `/setup` |
+| "research", "investigate", "look into", "find out" | `/research` |
+| "experiment", "optimize", "try", "A/B", "measure" | `/experiment` |
+| "debug", "root cause", "diagnose", "why is", "investigate bug" | `/systematic-debugging` |
+| "research fleet", "parallel research", "multi-angle research", "compare options" | `/research-fleet` |
+| "preview", "screenshot", "visual check", "does it render" | `/live-preview` |
 
 If ONE skill matches with high confidence → invoke it directly. Done.
 If MULTIPLE skills match → fall through to Tier 3.
@@ -166,7 +193,7 @@ ORCHESTRATION
   /do [intent]          Universal router
   /marshal [direction]  Single-session orchestrator
   /archon [direction]   Multi-session campaigns
-  /fleet [direction]    Parallel campaign orchestrator
+  /fleet [direction]    Parallel campaigns with coordination safety
   /autopilot            Intake-to-delivery pipeline
 
 SKILLS
@@ -176,6 +203,13 @@ SKILLS
   /refactor             Safe multi-file refactoring
   /scaffold             Project-aware scaffolding
   /create-skill         Create new skills from patterns
+
+RESEARCH & DEBUGGING
+  /research             Structured investigation with findings
+  /research-fleet       Parallel multi-scout research
+  /experiment           Metric-driven optimization loops
+  /systematic-debugging Root cause analysis (4-phase)
+  /live-preview         Mid-build visual verification
 
 UTILITIES
   /session-handoff      Session context transfer

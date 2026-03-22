@@ -117,9 +117,38 @@ Create the harness directory structure if it doesn't exist:
   "features": {
     "intakeScanner": true,
     "telemetry": true
+  },
+  "registeredSkills": ["{list of all skill directory names}"],
+  "registeredSkillCount": "{count of skill directories}",
+  "agentTimeouts": {
+    "skill": 600000,
+    "research": 900000,
+    "build": 1800000
   }
 }
 ```
+
+**Skill registry rebuild:** During setup, scan all directories in `.claude/skills/`,
+read each SKILL.md frontmatter, and populate `registeredSkills` with every skill name.
+Set `registeredSkillCount` to match. This is the full registry rebuild that `/do`'s
+Step 0 defers to.
+
+**Dependency pattern suggestions:** After detecting the stack, read `package.json`
+and check for common libraries that have known anti-patterns:
+
+| If Installed | Suggest Banning | Message |
+|---|---|---|
+| `@tanstack/react-query` | `fetch(`, `axios(`, `XMLHttpRequest` | Use tanstack query instead of raw fetch |
+| `zustand` | `React.createContext`, `useContext` | Use Zustand store instead of React Context |
+| `date-fns` | `new Date().toLocaleDateString`, `moment(` | Use date-fns for date formatting |
+| `zod` | `typeof `, `instanceof ` | Use Zod schemas for runtime validation |
+
+For each match: **ask the user** before adding. Present the suggestion and let them
+accept or skip. Example: "I see @tanstack/react-query is installed. Want me to warn
+agents when they use raw fetch() instead? (y/n)"
+
+Add accepted patterns to the `dependencyPatterns` array in harness.json. Users can
+add their own patterns later — the format is documented in docs/HOOKS.md.
 
 **Language-specific typecheck configuration:**
 
@@ -137,7 +166,9 @@ If the language checker isn't installed, log a message:
 "Note: [mypy/pyright] not found. Install it for per-file type checking, or the
 typecheck hook will be skipped."
 
-**Generate/update CLAUDE.md** if one doesn't exist:
+**CLAUDE.md — Merge, Never Overwrite:**
+
+If CLAUDE.md does NOT exist, generate a starter:
 
 ```markdown
 # {Project Name}
@@ -156,9 +187,33 @@ The more specific you are, the better the harness works.)
 
 ## Architecture
 (Describe your project's directory structure and layer boundaries here.)
+
+## Citadel Harness
+
+This project uses the [Citadel](https://github.com/SethGammon/Citadel) agent
+orchestration harness. Configuration is in `.claude/harness.json`.
 ```
 
-If CLAUDE.md already exists, do NOT overwrite it. Just confirm it's there.
+If CLAUDE.md ALREADY exists:
+1. Read the existing content
+2. Check if it contains `## Citadel Harness` or references to `harness.json`
+3. If missing: **append** a `## Citadel Harness` section at the bottom with harness
+   reference lines. NEVER overwrite or delete existing content.
+4. If already present: skip, don't duplicate
+
+**`.claude/settings.json` — Merge Hooks, Never Replace:**
+
+If `.claude/settings.json` does NOT exist, write Citadel's hook configuration normally.
+
+If `.claude/settings.json` ALREADY exists:
+1. Read and parse the existing JSON
+2. For each Citadel hook (PreToolUse, PostToolUse, etc.):
+   a. If the lifecycle event has no existing hooks → add Citadel's hooks
+   b. If the lifecycle event already has hooks → append Citadel's hooks to the
+      existing array (check for duplicates by comparing command strings first)
+   c. NEVER replace or remove existing hooks
+3. Write back the merged configuration
+4. Log: "Merged {N} Citadel hooks into existing settings.json (preserved {M} existing hooks)"
 
 ### Step 3: DEMONSTRATE (run one real task)
 
@@ -184,32 +239,38 @@ Print this reference card:
 ```
 ┌──────────────────────────────────────────────────────┐
 │                                                      │
-│  HARNESS READY                                       │
+│  HARNESS READY — 18 skills registered                │
 │                                                      │
-│  /do [anything]      Route to the right tool         │
-│  /do status          Show active work                │
-│  /do continue        Resume where you left off       │
-│  /do --list          Show all available skills       │
+│  /do [anything]           Route to the right tool    │
+│  /do status               Show active work           │
+│  /do continue             Resume where you left off  │
+│  /do --list               Show all 18 skills         │
 │                                                      │
-│  SKILLS                                              │
-│  /review             5-pass code review              │
-│  /test-gen           Generate tests that run         │
-│  /doc-gen            Generate documentation          │
-│  /refactor           Safe multi-file refactoring     │
-│  /scaffold           Project-aware scaffolding       │
-│  /create-skill       Build your own skills           │
+│  CORE SKILLS                                         │
+│  /review                  5-pass code review         │
+│  /test-gen                Generate tests that run    │
+│  /doc-gen                 Generate documentation     │
+│  /refactor                Safe multi-file refactoring│
+│  /scaffold                Project-aware scaffolding  │
+│  /create-skill            Build your own skills      │
+│                                                      │
+│  RESEARCH & DEBUGGING                                │
+│  /research                Structured investigation   │
+│  /research-fleet          Parallel multi-scout       │
+│  /experiment              Metric-driven optimization │
+│  /systematic-debugging    Root cause analysis        │
 │                                                      │
 │  ORCHESTRATORS                                       │
-│  /marshal [thing]    Multi-step, one session         │
-│  /archon [thing]     Multi-session campaigns         │
-│  /fleet [thing]      Parallel campaigns              │
+│  /marshal [thing]         Multi-step, one session    │
+│  /archon [thing]          Multi-session campaigns    │
+│  /fleet [thing]           Parallel campaigns         │
 │                                                      │
 │  NEXT STEPS                                          │
 │  1. Add your conventions to CLAUDE.md                │
 │  2. Try /do "review the most important file"         │
 │  3. Run /create-skill to capture a repeated pattern  │
 │                                                      │
-│  Docs: docs/ARCHITECTURE.md, docs/SKILLS.md          │
+│  Docs: QUICKSTART.md, docs/SKILLS.md                 │
 │                                                      │
 └──────────────────────────────────────────────────────┘
 ```

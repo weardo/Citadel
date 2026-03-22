@@ -170,6 +170,21 @@ function getTypecheckConfig(language) {
   }
 }
 
+
+/**
+ * Log a hook block or error event to hook-errors.log.
+ * One line per event: timestamp | hook | action | detail
+ * @param {string} hook - Hook name
+ * @param {string} action - What happened ('blocked', 'error', 'parse-fail')
+ * @param {string} detail - What was blocked or what failed
+ */
+function logBlock(hook, action, detail) {
+  ensureTelemetryDir();
+  try {
+    const line = `${new Date().toISOString()} | ${hook} | ${action} | ${detail}
+`;
+    fs.appendFileSync(path.join(TELEMETRY_DIR, 'hook-errors.log'), line, 'utf8');
+  } catch { /* telemetry should never break the hook */ }
 // ── Input Validation ────────────────────────────────────────────────────────
 
 // Paths allow backslash (Windows path separator).
@@ -205,6 +220,7 @@ function securityWarning(hook, message) {
 module.exports = {
   increment,
   logTiming,
+  logBlock,
   readConfig,
   detectStack,
   getTypecheckConfig,

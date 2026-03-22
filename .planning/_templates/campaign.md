@@ -30,6 +30,25 @@ Direction: {The original user direction that created this campaign}
   Reason: ESM native, better TypeScript types, actively maintained
 -->
 
+## Review Queue
+<!-- Items that need human review. Archon adds items here; user reviews them. -->
+<!-- Format: - [ ] {Type}: {Description} -->
+<!-- Types: Visual, Architecture, UX, Security, Performance -->
+<!-- Example:
+- [ ] Visual: Check the new dashboard layout looks right on mobile
+- [ ] Architecture: Verify the event bus pattern is correct for cross-domain comm
+- [ ] UX: Confirm the onboarding flow feels natural
+-->
+
+## Circuit Breakers
+<!-- Conditions that should trigger parking this campaign. Defined at creation. -->
+<!-- Example:
+- 3+ consecutive sub-agent failures on the same phase
+- Typecheck introduces 5+ new errors
+- Direction drift detected (built features don't serve the original goal)
+- Fundamental architectural conflict discovered
+-->
+
 ## Active Context
 <!-- Where the campaign is RIGHT NOW. Updated on every session. -->
 Campaign just created. Starting with Phase 1 (Research).

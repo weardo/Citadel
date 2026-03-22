@@ -106,6 +106,30 @@ If the investigation revealed reusable patterns or pitfalls:
 - Suggest creating a skill if a pattern will recur: "This pattern would
   make a good skill. Run `/create-skill` to capture it."
 
+## Agent Timeouts
+
+When Marshal spawns sub-agents (e.g., for parallel investigation or delegated
+skill execution), it must enforce execution time limits. Sub-agents can hang
+indefinitely on tool calls — the circuit breaker catches failures, not hangs.
+
+### Default Timeouts
+
+| Agent Type | Default Timeout |
+|---|---|
+| Skill-level agents | 10 minutes |
+| Research agents | 15 minutes |
+
+Timeouts are configurable in `harness.json` under `agentTimeouts` (same config
+Fleet uses). If an agent exceeds its timeout:
+
+1. Log the timeout in telemetry
+2. Check for partial output — extract usable findings if any
+3. Try one alternative approach (simpler prompt, reduced scope)
+4. If retry also times out, skip and note the gap in the report
+
+Never wait indefinitely. A timed-out agent's scope becomes a "gap" in the
+Marshal Report's Findings section.
+
 ## Quality Gates
 
 - Every finding must cite a specific file and line number

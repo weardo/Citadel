@@ -73,6 +73,58 @@ Configure in `harness.json`:
 }
 ```
 
+## Dependency-Aware Pattern Detection
+
+The `post-edit.js` hook can warn agents when they use raw APIs that an installed
+library already handles. This prevents agents from reinventing what your project
+already has.
+
+Configure in `harness.json`:
+
+```json
+{
+  "dependencyPatterns": [
+    {
+      "dependency": "@tanstack/react-query",
+      "banned": ["fetch(", "axios(", "XMLHttpRequest"],
+      "message": "Use tanstack query instead of raw fetch. See: https://tanstack.com/query"
+    },
+    {
+      "dependency": "zustand",
+      "banned": ["React.createContext", "useContext"],
+      "message": "Use Zustand store instead of React Context for shared state"
+    },
+    {
+      "dependency": "date-fns",
+      "banned": ["new Date().toLocaleDateString", "moment("],
+      "message": "Use date-fns for date formatting — it's already installed"
+    },
+    {
+      "dependency": "zod",
+      "banned": ["typeof ", "instanceof "],
+      "message": "Use Zod schemas for runtime validation instead of manual type checks"
+    }
+  ]
+}
+```
+
+**How it works:**
+
+1. On each edit, reads `dependencyPatterns` from harness.json (skips entirely if missing)
+2. Reads `package.json` once per session and caches the dependency list
+3. For each pattern entry: if the dependency is installed, scans the edited file for banned strings
+4. Surfaces warnings (not blocks) — the agent sees the feedback and self-corrects
+
+**Rules:**
+
+- `dependencyPatterns` is optional. If absent, zero cost — the section is skipped entirely.
+- Only the edited file is scanned, not the whole project.
+- `package.json` is read once and cached for the process lifetime.
+- Warnings only. The agent receives the feedback but the edit is not blocked.
+- One warning per dependency per edit (not per match).
+
+`/do setup` will detect common dependencies and offer to add patterns during first run.
+
 ## Circuit Breaker
 
 Tracks tool failures. After 3 failures:
