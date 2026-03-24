@@ -20,6 +20,8 @@ git clone https://github.com/SethGammon/Citadel.git
 cp -r Citadel/.claude Citadel/.planning Citadel/scripts your-project/
 ```
 
+> **Already have a `.claude/settings.json`?** The copy above will overwrite it. Back up your existing settings first: `cp your-project/.claude/settings.json your-project/.claude/settings.json.bak` — then merge the Citadel hooks into your existing file after install.
+
 <details>
 <summary>Windows? Use PowerShell or Command Prompt instead</summary>
 
