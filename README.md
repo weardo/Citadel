@@ -17,21 +17,27 @@ Run autonomous coding campaigns with Claude Code. Route any task through the rig
 Citadel is a Claude Code **plugin** — install once, works across all your projects. No per-project file copying.
 
 ```bash
-# 1. Clone and register as a local plugin
+# 1. Clone Citadel
 git clone https://github.com/SethGammon/Citadel.git
 
-# In Claude Code, add as a local marketplace and install:
-/plugin marketplace add /path/to/Citadel
-/plugin install citadel@citadel-local
+# 2. Launch Claude Code with the plugin loaded
+claude --plugin-dir /path/to/Citadel
 
-# 2. Run setup (inside any project)
+# 3. Run setup (inside any project)
 /do setup
 
-# 3. Try something
+# 4. Try something
 /do review src/main.ts
 ```
 
-That's it. The `init-project` hook auto-scaffolds `.planning/` and `.citadel/scripts/` on every session start. [Full install guide →](QUICKSTART.md)
+For persistent install across all sessions, use the marketplace method inside Claude Code:
+```
+/plugin marketplace add /path/to/Citadel
+/plugin install citadel@citadel-local
+/reload-plugins
+```
+
+[Full install guide →](QUICKSTART.md)
 
 ## Try These First
 

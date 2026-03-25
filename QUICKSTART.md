@@ -16,22 +16,27 @@ No API key setup needed — Citadel inherits Claude Code's authentication.
 git clone https://github.com/SethGammon/Citadel.git
 ```
 
-Then register it as a local plugin in Claude Code:
+### Option A: Quick start (per-session)
 
-```
-# Add as a local marketplace
-/plugin marketplace add /path/to/Citadel
-
-# Install the plugin
-/plugin install citadel@citadel-local
-```
-
-Alternatively, load it for a single session without installing:
+Launch Claude Code with the plugin loaded:
 ```bash
 claude --plugin-dir /path/to/Citadel
 ```
 
-No file copying required. The plugin installs once and works across all your projects.
+This loads the plugin for the current session. Use this to get started immediately.
+
+### Option B: Persistent install (all sessions)
+
+Inside Claude Code, register the marketplace and install:
+```
+/plugin marketplace add /path/to/Citadel
+/plugin install citadel@citadel-local
+/reload-plugins
+```
+
+This installs the plugin permanently — no flags needed on future sessions.
+
+> **Troubleshooting:** If `/plugin install` says "Plugin not found", launch with `claude --plugin-dir /path/to/Citadel` first, then run the marketplace add and install from inside that session.
 
 ## 2. Run setup
 
