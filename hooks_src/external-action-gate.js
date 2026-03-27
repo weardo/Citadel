@@ -3,11 +3,16 @@
 /**
  * external-action-gate.js — PreToolUse hook (Bash)
  *
- * Blocks external-facing actions that publish content under the user's name:
- *   - git push (any variant)
- *   - gh pr/issue create/comment/close/edit/merge/delete
+ * Blocks irreversible external actions that cannot be undone:
+ *   - gh pr merge/close/delete
+ *   - gh issue close/delete
  *   - gh release create, gh repo fork
  *   - gh api with mutating methods
+ *
+ * Allowed (reversible — agent may do these autonomously):
+ *   - git push (branch can be force-reset or deleted)
+ *   - gh pr create (can be closed)
+ *   - gh pr/issue comment/edit
  *
  * Strips quoted strings and heredoc bodies before matching to avoid
  * false positives from commit messages and PR descriptions.
@@ -23,30 +28,15 @@
 const health = require('./harness-health-util');
 
 const BLOCKED_PATTERNS = [
-  { regex: /\bgit\s+push\b/, label: 'git push' },
-  { regex: /\bgh\s+pr\s+create\b/, label: 'gh pr create' },
   { regex: /\bgh\s+pr\s+merge\b/, label: 'gh pr merge' },
   { regex: /\bgh\s+pr\s+close\b/, label: 'gh pr close' },
-  { regex: /\bgh\s+pr\s+comment\b/, label: 'gh pr comment' },
-  { regex: /\bgh\s+pr\s+edit\b/, label: 'gh pr edit' },
-  { regex: /\bgh\s+pr\s+review\b/, label: 'gh pr review' },
-  { regex: /\bgh\s+issue\s+create\b/, label: 'gh issue create' },
-  { regex: /\bgh\s+issue\s+comment\b/, label: 'gh issue comment' },
   { regex: /\bgh\s+issue\s+close\b/, label: 'gh issue close' },
-  { regex: /\bgh\s+issue\s+edit\b/, label: 'gh issue edit' },
   { regex: /\bgh\s+issue\s+delete\b/, label: 'gh issue delete' },
   { regex: /\bgh\s+release\s+create\b/, label: 'gh release create' },
   { regex: /\bgh\s+repo\s+fork\b/, label: 'gh repo fork' },
-  { regex: /gh\.exe"\s+pr\s+create\b/, label: 'gh pr create' },
   { regex: /gh\.exe"\s+pr\s+merge\b/, label: 'gh pr merge' },
   { regex: /gh\.exe"\s+pr\s+close\b/, label: 'gh pr close' },
-  { regex: /gh\.exe"\s+pr\s+comment\b/, label: 'gh pr comment' },
-  { regex: /gh\.exe"\s+pr\s+edit\b/, label: 'gh pr edit' },
-  { regex: /gh\.exe"\s+pr\s+review\b/, label: 'gh pr review' },
-  { regex: /gh\.exe"\s+issue\s+create\b/, label: 'gh issue create' },
-  { regex: /gh\.exe"\s+issue\s+comment\b/, label: 'gh issue comment' },
   { regex: /gh\.exe"\s+issue\s+close\b/, label: 'gh issue close' },
-  { regex: /gh\.exe"\s+issue\s+edit\b/, label: 'gh issue edit' },
   { regex: /gh\.exe"\s+issue\s+delete\b/, label: 'gh issue delete' },
   { regex: /gh\.exe"\s+release\s+create\b/, label: 'gh release create' },
   { regex: /gh\.exe"\s+repo\s+fork\b/, label: 'gh repo fork' },
