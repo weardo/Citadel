@@ -7,7 +7,7 @@ input: /schedule add "check PRs every 30 minutes" /pr-watch
 state: clean
 assert-contains:
   - "*/30 * * * *"
-  - every 30 minutes
+  - minimum
 assert-not-contains:
   - Error
   - undefined

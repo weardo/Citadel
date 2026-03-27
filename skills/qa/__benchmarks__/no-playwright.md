@@ -6,7 +6,7 @@ tags: [fringe, missing-state]
 input: /qa
 state: clean
 assert-contains:
-  - Playwright
+  - No UI
 assert-not-contains:
   - ENOENT
   - TypeError

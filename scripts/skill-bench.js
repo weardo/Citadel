@@ -104,7 +104,9 @@ function parseScenario(filePath) {
 
     // YAML list item
     if (/^\s+-\s+/.test(line) && currentListKey) {
-      const value = line.replace(/^\s+-\s+/, '').trim();
+      let value = line.replace(/^\s+-\s+/, '').trim();
+      // Strip surrounding quotes (YAML allows quoting list values: - "pattern")
+      value = value.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
       fm[currentListKey] = fm[currentListKey] || [];
       fm[currentListKey].push(value);
       i++;
@@ -126,7 +128,7 @@ function parseScenario(filePath) {
         // Inline list: [a, b, c]
         fm[key] = val.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
       } else {
-        fm[key] = val;
+        fm[key] = val.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
       }
     } else {
       currentListKey = null;
@@ -294,6 +296,39 @@ const STATES = {
       path.join(telemetryDir, 'audit.jsonl'),
       entries.filter(e => e.event).map(e => JSON.stringify(e)).join('\n') + '\n'
     );
+  },
+
+  'with-intake': (tmpDir) => {
+    const intakeDir = path.join(tmpDir, '.planning', 'intake');
+    fs.mkdirSync(intakeDir, { recursive: true });
+    fs.writeFileSync(path.join(intakeDir, 'add-logging.md'), [
+      '---',
+      'status: briefed',
+      'priority: high',
+      '---',
+      '',
+      '# Add structured logging to API endpoints',
+      '',
+      '## Problem',
+      'No visibility into API call patterns or errors in production.',
+      '',
+      '## Approach',
+      'Add a logging middleware that records method, path, status, and duration.',
+      'Write logs to .planning/telemetry/api-requests.jsonl.',
+      '',
+      '## Acceptance criteria',
+      '- Every API call logged with timestamp, method, path, status, duration_ms',
+      '- No existing tests broken',
+    ].join('\n'));
+    fs.writeFileSync(path.join(tmpDir, 'CLAUDE.md'), [
+      '# Test Project',
+      '',
+      'A simple Express API.',
+      '',
+      '## Stack',
+      '- Node.js + Express',
+      '- Jest for tests',
+    ].join('\n'));
   },
 
   'with-fleet-session': (tmpDir) => {

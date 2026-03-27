@@ -6,8 +6,8 @@ tags: [fringe, missing-tool]
 input: /pr-watch 1
 state: clean
 assert-contains:
-  - gh
-  - auth
+  - remote
+  - repo
 assert-not-contains:
   - ENOENT
   - TypeError

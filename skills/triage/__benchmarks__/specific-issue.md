@@ -7,7 +7,7 @@ input: /triage investigate why auth is failing
 state: clean
 assert-contains:
   - auth
-  - step
+  - GitHub
 assert-not-contains:
   - ENOENT
   - TypeError

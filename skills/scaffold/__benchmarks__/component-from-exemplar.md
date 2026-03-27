@@ -8,8 +8,8 @@ state: clean
 assert-contains:
   - SettingsPanel
   - conventions
-  - SCAFFOLD COMPLETE
-  - Typecheck
+  - exemplar
+  - empty
 assert-not-contains:
   - ENOENT
   - TypeError

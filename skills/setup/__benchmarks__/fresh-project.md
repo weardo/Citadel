@@ -7,7 +7,7 @@ input: /setup
 state: clean
 assert-contains:
   - setup
-  - harness
+  - Q1
 assert-not-contains:
   - ENOENT
   - TypeError

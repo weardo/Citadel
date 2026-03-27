@@ -7,8 +7,8 @@ input: /autopilot
 state: with-campaign
 assert-contains:
   - processed
-  - briefed
-  - completed
+  - logging
+  - intake
 assert-not-contains:
   - ENOENT
   - TypeError

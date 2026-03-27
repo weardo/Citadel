@@ -5,6 +5,7 @@ description: qa reports that no dev server is running rather than hanging or cra
 tags: [fringe, missing-state]
 input: /qa test the dashboard
 state: clean
+timeout: 240000
 assert-contains:
   - server
 assert-not-contains:

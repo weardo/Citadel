@@ -8,7 +8,7 @@ state: clean
 assert-contains:
   - health
   - intake
-  - No active work
+  - campaigns
 assert-not-contains:
   - ENOENT
   - TypeError

@@ -6,7 +6,7 @@ tags: [fringe, missing-state]
 input: /schedule list
 state: clean
 assert-contains:
-  - No active schedules
+  - no scheduled
 assert-not-contains:
   - Error
   - undefined

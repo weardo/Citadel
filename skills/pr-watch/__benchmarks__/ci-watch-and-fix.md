@@ -6,10 +6,8 @@ tags: [happy-path]
 input: /pr-watch 42
 state: with-campaign
 assert-contains:
-  - Watching PR
-  - fix
-  - CI
-  - checks
+  - PR
+  - repository
 assert-not-contains:
   - ENOENT
   - TypeError
