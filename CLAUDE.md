@@ -13,7 +13,7 @@ Claude Code to operate autonomously on any codebase. It provides:
 
 ## Key Conventions
 
-- Skills live in `skills/`. Each has a SKILL.md with the full protocol.
+- Skills live in `skills/`. Each skill is a flat `skills/{name}.md` file.
 - Agents live in `agents/`. They spawn as sub-processes with their own context.
 - Hooks live in `hooks_src/`. Installed per-project via `scripts/install-hooks.js`.
 - The `init-project` hook auto-scaffolds per-project state on session start:
@@ -37,7 +37,7 @@ Always run tests after modifying hooks or skills. Three levels:
 | `node scripts/skill-bench.js` | Scenario file validity | After adding benchmarks |
 | `node scripts/skill-bench.js --execute` | Live scenario execution | Before shipping |
 
-**Adding a new skill:** create `skills/{name}/SKILL.md`, then run `node scripts/skill-lint.js {name}` to verify structure.
+**Adding a new skill:** create `skills/{name}.md`, then run `node scripts/skill-lint.js {name}` to verify structure. The `skills/{name}/` directory (for `__benchmarks__/`) is optional and separate.
 
 **Adding a benchmark scenario:** create `skills/{name}/__benchmarks__/{scenario}.md`, then run `node scripts/skill-bench.js --skill {name}` to validate.
 

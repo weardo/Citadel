@@ -213,18 +213,15 @@ function discoverSkills() {
   if (!fs.existsSync(SKILLS_DIR)) return [];
 
   return fs.readdirSync(SKILLS_DIR)
-    .filter(name => {
-      const skillPath = path.join(SKILLS_DIR, name);
-      return fs.statSync(skillPath).isDirectory() &&
-             fs.existsSync(path.join(skillPath, 'SKILL.md'));
-    })
+    .filter(name => name.endsWith('.md') && fs.statSync(path.join(SKILLS_DIR, name)).isFile())
+    .map(name => name.slice(0, -3)) // strip .md extension to get skill name
     .sort();
 }
 
 // ── Lint one skill ────────────────────────────────────────────────────────────
 
 function lintSkill(skillName) {
-  const filePath = path.join(SKILLS_DIR, skillName, 'SKILL.md');
+  const filePath = path.join(SKILLS_DIR, skillName + '.md');
   const content  = fs.readFileSync(filePath, 'utf8');
   const { frontmatter, body } = parseFrontmatter(content);
 
