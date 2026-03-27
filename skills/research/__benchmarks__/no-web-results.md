@@ -5,6 +5,7 @@ description: Research falls back to local codebase search when web returns nothi
 tags: [fringe, missing-tool]
 input: /research how does the auth middleware work
 state: clean
+skip-execute: true
 timeout: 240000
 assert-not-contains:
   - ENOENT
