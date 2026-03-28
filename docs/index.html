@@ -128,8 +128,11 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
       animation: aurora-shift 8s ease infinite;
+      max-height: 200px; overflow: hidden;
       transition: font-size 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-                  margin-bottom 0.5s ease;
+                  margin-bottom 0.5s ease,
+                  max-height 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                  opacity 0.35s ease;
     }
     .hero p {
       font-size: 17px; color: var(--muted); line-height: 1.7;
@@ -315,13 +318,15 @@
     }
 
     /* ─── Tier cascade ─── */
-    .tier-cascade { padding: 24px 24px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .tier-cascade { padding: 20px 24px 8px; display: flex; flex-direction: row; gap: 8px; align-items: stretch; }
 
     .tier-row {
-      display: grid;
-      grid-template-columns: 120px 1fr auto;
-      align-items: center; gap: 20px;
-      padding: 20px 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-width: 0;
+      padding: 14px 14px 12px;
       border-radius: 12px;
       border: 1.5px solid var(--border);
       background: var(--surface-2);
@@ -330,10 +335,10 @@
       transition: opacity 0.3s, border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.2s;
     }
     .tier-row::after {
-      content: ''; position: absolute; top: 0; left: -120px;
-      width: 120px; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
-      transform: translateX(0); opacity: 0;
+      content: ''; position: absolute; left: 0; top: -120px;
+      width: 100%; height: 120px;
+      background: linear-gradient(180deg, transparent, rgba(255,255,255,0.08), transparent);
+      transform: translateY(0); opacity: 0;
       transition: none;
     }
     .tier-row.checking::after {
@@ -341,8 +346,8 @@
       animation: tier-scan 0.9s linear infinite;
     }
     @keyframes tier-scan {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(calc(100% + 120px + 100%)); }
+      0%   { transform: translateY(0); }
+      100% { transform: translateY(calc(100% + 120px + 100%)); }
     }
     .tier-row.checking { opacity: 0.7; }
     .tier-row.matched {
@@ -367,25 +372,25 @@
       margin-left: 10px; opacity: 0.5;
     }
 
-    .tier-left { display: flex; flex-direction: column; gap: 6px; }
+    .tier-left { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-bottom: 10px; flex-shrink: 0; }
     .tier-badge {
-      font-size: 11px; font-weight: 700; letter-spacing: 2px;
-      padding: 5px 12px; border-radius: 6px; white-space: nowrap;
-      border: 1.5px solid currentColor; text-align: center;
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+      border: 1.5px solid currentColor; text-align: center; flex-shrink: 0;
     }
-    .tier-sub { font-size: 11px; color: var(--dim); text-align: center; letter-spacing: 0.5px; }
+    .tier-sub { font-size: 10px; color: var(--dim); letter-spacing: 0.5px; }
 
-    .tier-center { min-width: 0; }
-    .tier-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .tier-center { flex: 1; min-width: 0; }
+    .tier-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
     .tier-desc {
-      font-size: 12px; color: var(--muted); line-height: 1.55;
+      font-size: 11px; color: var(--muted); line-height: 1.5;
       max-height: 44px; overflow: hidden;
       transition: max-height 0.45s ease, opacity 0.35s ease;
     }
 
     .tier-status {
-      font-size: 12px; font-weight: 600; white-space: nowrap;
-      text-align: right; min-width: 130px;
+      font-size: 10px; font-weight: 600; white-space: normal;
+      text-align: left; min-width: 0; margin-top: auto; padding-top: 10px;
     }
 
     /* ─── Classification panel (Tier 3) ─── */
@@ -751,13 +756,13 @@
 
     /* ─── Mode: result — hero compresses, generators fold, tiers collapse ─── */
     body.mode-result .hero {
-      padding: 18px 40px 8px;
+      padding: 10px 40px 4px;
     }
     body.mode-result .hero-eyebrow {
       max-height: 0; opacity: 0; margin-bottom: 0;
     }
     body.mode-result .hero h1 {
-      font-size: 22px; margin-bottom: 4px;
+      max-height: 0; opacity: 0; margin-bottom: 0; overflow: hidden;
     }
     body.mode-result .hero h1 br,
     body.mode-result .hero h1 .h1-sub {
@@ -1045,8 +1050,10 @@
       #cmd-input { padding: 18px 140px 18px 60px; font-size: 15px; }
       .search-prompt { font-size: 15px; left: 20px; }
       .playground { padding: 0 16px 40px; }
-      .tier-row { grid-template-columns: 90px 1fr; }
-      .tier-status { display: none; }
+      .tier-cascade { flex-direction: column; }
+      .tier-row { display: grid !important; grid-template-columns: 90px 1fr; flex: unset; padding: 12px 16px; }
+      .tier-left { flex-direction: column; gap: 4px; margin-bottom: 0; }
+      .tier-status { display: none !important; }
       .how-section { grid-template-columns: 1fr; padding: 32px 16px 40px; }
       .stat-bar { grid-template-columns: repeat(2, 1fr); }
       .stat { border-bottom: 1px solid var(--border); }
@@ -1071,6 +1078,52 @@
       .nav-star { display: none; }
     }
 
+    /* ─── Try bar ─── */
+    .try-bar {
+      padding: 12px 24px 16px;
+      display: flex; align-items: center; gap: 10px;
+      border-top: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .try-bar-label {
+      font-size: 11px; color: var(--dim);
+      font-family: 'SF Mono', monospace; white-space: nowrap;
+    }
+    .try-btn {
+      font-size: 11px; padding: 5px 14px; border-radius: 20px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--tc, var(--muted)); cursor: pointer;
+      font-family: 'SF Mono', monospace;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .try-btn:hover {
+      border-color: var(--tc); color: var(--tc);
+      background: color-mix(in srgb, var(--tc) 8%, transparent);
+    }
+
+    /* ─── Live agents indicator ─── */
+    .eyebrow-sep { opacity: 0.4; margin: 0 2px; }
+    .live-agents {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: var(--green); font-size: 10px;
+    }
+    .live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor;
+      animation: live-pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes live-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.25; transform: scale(0.7); }
+    }
+
+    /* ─── Gen card ambient glow ─── */
+    @keyframes card-breathe {
+      0%, 100% { box-shadow: none; background: color-mix(in srgb, var(--gc) 3%, var(--surface-2)); }
+      50% { box-shadow: 0 0 22px color-mix(in srgb, var(--gc) 12%, transparent); background: color-mix(in srgb, var(--gc) 7%, var(--surface-2)); }
+    }
+    .gen-btn { animation: card-breathe 5s ease-in-out infinite; }
+    .gen-btn:hover, .gen-btn.busy { animation: none; }
+
     /* ─── prefers-reduced-motion ─── */
     @media (prefers-reduced-motion: reduce) {
       .tier-row, .output-section, .result-panel,
@@ -1081,6 +1134,8 @@
       .t2-r1, .t2-r2, .t2-r3 { animation: none !important; }
       .t3-chip { animation: none !important; opacity: 1 !important; transform: none !important; }
       .tf-f1, .tf-f2, .tf-f3 { animation: none !important; width: 60% !important; }
+      .gen-btn { animation: none !important; }
+      .live-dot { animation: none !important; }
     }
   </style>
 </head>
@@ -1108,9 +1163,11 @@
   <div class="hero">
     <div class="hero-eyebrow">
       <span>Agent orchestration for Claude Code</span>
+      <span class="eyebrow-sep">·</span>
+      <span class="live-agents"><span class="live-dot"></span><span id="live-agent-count">3</span> agents active</span>
     </div>
-    <h1>Every command costs the same.<br><span class="h1-sub">Most of them shouldn't.</span></h1>
-    <p>Type what you want. Citadel finds the cheapest way to do it.</p>
+    <h1>One command.<br><span class="h1-sub">The right agent, every time.</span></h1>
+    <p>Four routing tiers — pattern match to full LLM. Stops at the first match. Most commands cost nothing.</p>
   </div>
 
   <!-- Search bar -->
@@ -1263,6 +1320,13 @@
       <div class="history-section" id="history-section">
         <div class="history-label">Recently routed</div>
         <div class="history-items" id="history-items"></div>
+      </div>
+      <div class="try-bar" id="try-bar" style="display:none">
+        <span class="try-bar-label">try another →</span>
+        <button class="try-btn" style="--tc:var(--green)" onclick="generate('instant')">⚡ Instant</button>
+        <button class="try-btn" style="--tc:var(--cyan)" onclick="generate('skill')">◆ Skill</button>
+        <button class="try-btn" style="--tc:var(--orange)" onclick="generate('campaign')">⬡ Campaign</button>
+        <button class="try-btn" style="--tc:var(--purple)" onclick="generate('fleet')">⬢ Fleet</button>
       </div>
     </div>
 
@@ -1935,6 +1999,7 @@
       `;
 
       outSection.classList.add('visible');
+      document.getElementById('try-bar').style.display = 'flex';
       // Scroll output card into view within screen-1
       setTimeout(() => outSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
 
@@ -1981,6 +2046,7 @@
       document.body.classList.remove('mode-result');
       panel.classList.remove('visible');
       document.getElementById('screen-1').scrollTop = 0;
+      document.getElementById('try-bar').style.display = 'none';
       // Re-hide from layout after clip-path out-animation completes (700ms)
       setTimeout(() => { panel.style.display = ''; }, 750);
       input.value = '';
@@ -2386,9 +2452,11 @@
 
       // Expose tier-colored pulse for animateRoute
       window.fireTierPulse = function(x, y, maxR, speed, cssColor) {
-        // Resolve CSS variable to a usable color for the canvas
-        // We store it and apply it in the draw loop via a tinted burst
         pulses.push({ x, y, r: 0, maxR, speed, type: 'burst', age: 0, tint: cssColor });
+      };
+      // Expose ambient ripple for background activity simulation
+      window.fireAmbientPulse = function(x, y) {
+        pulses.push({ x, y, r: 0, maxR: 80 + Math.random() * 80, speed: 2.5 + Math.random() * 2, type: 'ripple', age: 0 });
       };
     })();
 
@@ -2427,6 +2495,37 @@
         doScroll();
       }
     }
+
+    // ─── Live agent counter ────────────────────────────────────────────────
+    (function liveAgentCounter() {
+      const el = document.getElementById('live-agent-count');
+      if (!el) return;
+      let count = 2 + Math.floor(Math.random() * 4);
+      function tick() {
+        if (!document.hidden) {
+          const delta = Math.random() < 0.5 ? 1 : -1;
+          count = Math.max(1, Math.min(12, count + delta));
+          el.textContent = count;
+        }
+        setTimeout(tick, 2500 + Math.random() * 3500);
+      }
+      setTimeout(tick, 4000);
+    })();
+
+    // ─── Autonomous background pulses (background agent activity) ─────────
+    (function autoPulse() {
+      let _W = window.innerWidth, _H = window.innerHeight;
+      window.addEventListener('resize', () => { _W = window.innerWidth; _H = window.innerHeight; });
+      function fire() {
+        if (!document.hidden && window.fireAmbientPulse) {
+          const x = _W * (0.1 + Math.random() * 0.8);
+          const y = _H * (0.1 + Math.random() * 0.8);
+          window.fireAmbientPulse(x, y);
+        }
+        setTimeout(fire, 3000 + Math.random() * 4000);
+      }
+      setTimeout(fire, 5000);
+    })();
 
     // ─── GitHub star count ─────────────────────────────────────────────────
     (function fetchStars() {
