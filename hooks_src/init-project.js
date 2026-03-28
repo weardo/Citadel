@@ -32,6 +32,32 @@ const PLANNING_DIRS = [
   '.planning/telemetry',
 ];
 
+function shouldSyncScripts() {
+  try {
+    const pkgPath = path.join(PLUGIN_ROOT, 'package.json');
+    if (!fs.existsSync(pkgPath)) return true; // can't determine — sync to be safe
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const pluginVersion = pkg.version || '0.0.0';
+
+    const versionFile = path.join(PROJECT_ROOT, '.citadel', 'version.txt');
+    if (!fs.existsSync(versionFile)) return true;
+
+    const installedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+    return installedVersion !== pluginVersion;
+  } catch {
+    return true; // on any error, sync to be safe
+  }
+}
+
+function writeVersionFile(pluginRoot, projectRoot) {
+  try {
+    const pkgPath = path.join(pluginRoot, 'package.json');
+    if (!fs.existsSync(pkgPath)) return;
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    fs.writeFileSync(path.join(projectRoot, '.citadel', 'version.txt'), pkg.version || '0.0.0');
+  } catch { /* non-fatal */ }
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -58,6 +84,20 @@ function main() {
       ensureDir(path.join(PROJECT_ROOT, dir));
     }
 
+    // 1b. Sweep stale coordination claims from crashed sessions
+    try {
+      const coordScript = path.join(PROJECT_ROOT, '.citadel', 'scripts', 'coordination.js');
+      const sweepScript = path.join(PLUGIN_ROOT, 'scripts', 'coordination.js');
+      const script = fs.existsSync(coordScript) ? coordScript : sweepScript;
+      if (fs.existsSync(script)) {
+        require('child_process').spawnSync('node', [script, 'sweep'], {
+          cwd: PROJECT_ROOT,
+          env: { ...process.env, CLAUDE_PROJECT_DIR: PROJECT_ROOT },
+          timeout: 5000,
+        });
+      }
+    } catch { /* non-fatal — don't block session start */ }
+
     // 2. Copy templates from plugin to project
     const pluginTemplates = path.join(PLUGIN_ROOT, '.planning', '_templates');
     const projectTemplates = path.join(PROJECT_ROOT, '.planning', '_templates');
@@ -72,19 +112,22 @@ function main() {
       fs.copyFileSync(pluginIntakeTemplate, intakeTemplate);
     }
 
-    // 4. Sync utility scripts to .citadel/scripts/
-    const pluginScripts = path.join(PLUGIN_ROOT, 'scripts');
-    const projectScripts = path.join(PROJECT_ROOT, '.citadel', 'scripts');
-    if (fs.existsSync(pluginScripts)) {
-      ensureDir(projectScripts);
-      for (const file of fs.readdirSync(pluginScripts)) {
-        if (file.endsWith('.js') || file.endsWith('.cjs')) {
-          fs.copyFileSync(
-            path.join(pluginScripts, file),
-            path.join(projectScripts, file)
-          );
+    // 4. Sync utility scripts to .citadel/scripts/ (version-gated to avoid unnecessary I/O)
+    if (shouldSyncScripts()) {
+      const pluginScripts = path.join(PLUGIN_ROOT, 'scripts');
+      const projectScripts = path.join(PROJECT_ROOT, '.citadel', 'scripts');
+      if (fs.existsSync(pluginScripts)) {
+        ensureDir(projectScripts);
+        for (const file of fs.readdirSync(pluginScripts)) {
+          if (file.endsWith('.js') || file.endsWith('.cjs')) {
+            fs.copyFileSync(
+              path.join(pluginScripts, file),
+              path.join(projectScripts, file)
+            );
+          }
         }
       }
+      writeVersionFile(PLUGIN_ROOT, PROJECT_ROOT);
     }
 
     // 5. Copy agent-context if missing

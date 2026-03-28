@@ -12,9 +12,12 @@
  *
  * Fail-closed: unexpected errors exit 2 (block) rather than 0 (allow).
  *
- * Supports glob-like patterns:
- *   - * matches any file in the directory
- *   - ** matches recursively (not implemented — keep it simple)
+ * Supports glob patterns:
+ *   - Exact path match
+ *   - dir/*  — files directly in a directory (single level)
+ *   - dir/   — all files under a directory prefix (trailing slash)
+ *   - src/** — recursive glob (any depth under src/)
+ *   - **\/*.ts — any .ts file at any depth
  */
 
 const fs = require('fs');
@@ -22,6 +25,22 @@ const path = require('path');
 const health = require('./harness-health-util');
 
 const PROJECT_ROOT = health.PROJECT_ROOT;
+
+const CITADEL_UI = process.env.CITADEL_UI === 'true';
+
+function hookOutput(hookName, action, message, data = {}) {
+  if (CITADEL_UI) {
+    process.stdout.write(JSON.stringify({
+      hook: hookName,
+      action,
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    }));
+  } else {
+    process.stdout.write(message);
+  }
+}
 
 function main() {
   let input = '';
@@ -33,9 +52,10 @@ function main() {
     } catch (err) {
       // Fail closed: unexpected errors block the action
       health.logBlock('protect-files', 'error', err.message || 'unknown error');
-      process.stdout.write(
+      hookOutput('protect-files', 'error',
         '[protect-files] Hook error — blocking action as a safety measure. ' +
-        'Check .planning/telemetry/hook-errors.log for details.'
+        'Check .planning/telemetry/hook-errors.log for details.',
+        { error: err.message || 'unknown error' }
       );
       process.exit(2);
     }
@@ -49,7 +69,7 @@ function run(input) {
   } catch {
     health.logBlock('protect-files', 'parse-fail', 'Could not parse stdin JSON');
     // Fail closed on parse failure — cannot determine if action is safe
-    process.stdout.write('[protect-files] Could not parse hook input — blocking as safety measure.');
+    hookOutput('protect-files', 'error', '[protect-files] Could not parse hook input — blocking as safety measure.');
     process.exit(2);
   }
 
@@ -70,8 +90,9 @@ function run(input) {
     const basename = path.basename(filePath);
     if (basename.startsWith('.env')) {
       health.logBlock('protect-files', 'blocked', `Read ${relativePath} (.env secrets)`);
-      process.stdout.write(
-        `[protect-files] Blocked: cannot read ${relativePath} — .env files contain secrets.`
+      hookOutput('protect-files', 'blocked',
+        `[protect-files] Blocked: cannot read ${relativePath} — .env files contain secrets.`,
+        { file: relativePath, reason: '.env secrets' }
       );
       process.exit(2);
     }
@@ -87,9 +108,10 @@ function run(input) {
   for (const pattern of protectedPatterns) {
     if (matchPattern(relativePath, pattern)) {
       health.logBlock('protect-files', 'blocked', `${toolName} ${relativePath} (pattern: ${pattern})`);
-      process.stdout.write(
+      hookOutput('protect-files', 'blocked',
         `[protect-files] Blocked: ${relativePath} is protected by pattern "${pattern}". ` +
-        `Remove the pattern from harness.json protectedFiles to allow edits.`
+        `Remove the pattern from harness.json protectedFiles to allow edits.`,
+        { file: relativePath, pattern, tool: toolName }
       );
       process.exit(2); // Block the edit
     }
@@ -154,9 +176,10 @@ function checkCampaignScope(relativePath, toolName, _filePath) {
       for (const entry of restrictedLines) {
         if (entry && matchPattern(relativePath, entry)) {
           health.logBlock('protect-files', 'blocked-restricted', `${toolName} ${relativePath} (campaign: ${campaignName}, restricted: ${entry})`);
-          process.stdout.write(
+          hookOutput('protect-files', 'blocked',
             `[protect-files] Blocked: ${relativePath} is declared RESTRICTED by campaign "${campaignName}". ` +
-            `Remove it from the campaign's "Restricted Files" section to allow edits.`
+            `Remove it from the campaign's "Restricted Files" section to allow edits.`,
+            { file: relativePath, campaign: campaignName, restrictedEntry: entry, tool: toolName }
           );
           process.exit(2);
         }
@@ -183,9 +206,10 @@ function checkCampaignScope(relativePath, toolName, _filePath) {
 
     // File is outside claimed scope — warn (advisory, not blocking)
     const scopeList = scopeEntries.slice(0, 5).join(', ') + (scopeEntries.length > 5 ? '…' : '');
-    process.stdout.write(
+    hookOutput('protect-files', 'warned',
       `[protect-files] Warning: ${relativePath} is outside the claimed scope of campaign "${campaignName}". ` +
-      `Campaign scope: ${scopeList}. This is advisory — the write will proceed.`
+      `Campaign scope: ${scopeList}. This is advisory — the write will proceed.`,
+      { file: relativePath, campaign: campaignName, scope: scopeEntries.slice(0, 5) }
     );
     health.increment('protect-files', 'scope-warning');
   } catch {
@@ -214,11 +238,30 @@ function matchScopeEntry(filePath, entry) {
   return matchPattern(filePath, entry);
 }
 
+/**
+ * Match a file path against a glob pattern.
+ *
+ * Supports:
+ *   - Exact path match
+ *   - dir/*  — files directly in a directory (single level)
+ *   - dir/   — all files under a directory prefix (trailing slash)
+ *   - src/** — recursive glob (any depth under src/)
+ *   - **\/*.ts — any .ts file at any depth
+ *
+ * @param {string} filePath - Relative file path, forward-slash separated
+ * @param {string} pattern - Glob pattern to match against
+ * @returns {boolean}
+ */
 function matchPattern(filePath, pattern) {
   // Exact match
   if (filePath === pattern) return true;
 
-  // Wildcard: pattern ends with /*
+  // Recursive glob: pattern contains **
+  if (pattern.includes('**')) {
+    return matchGlobStar(filePath, pattern);
+  }
+
+  // Single-level wildcard: pattern ends with /*
   if (pattern.endsWith('/*')) {
     const dir = pattern.slice(0, -2);
     return filePath.startsWith(dir + '/') && !filePath.slice(dir.length + 1).includes('/');
@@ -230,6 +273,35 @@ function matchPattern(filePath, pattern) {
   }
 
   return false;
+}
+
+/**
+ * Match a file path against a glob pattern containing **.
+ * ** matches any sequence of path segments (including zero).
+ * Examples:
+ *   src/** matches src/foo.ts, src/a/b/c.ts
+ *   **\/*.ts matches any .ts file at any depth
+ *   src/**\/index.ts matches src/foo/index.ts, src/foo/bar/index.ts
+ *
+ * @param {string} filePath - Relative file path, forward-slash separated
+ * @param {string} pattern - Glob pattern containing **
+ * @returns {boolean}
+ */
+function matchGlobStar(filePath, pattern) {
+  // Convert glob to regex
+  // Escape regex special chars except * and /
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex specials
+    .replace(/\*\*/g, '\x00')               // temporarily replace ** with placeholder
+    .replace(/\*/g, '[^/]*')                // * → match non-slash chars
+    .replace(/\x00/g, '.*');                // ** → match anything (including slashes)
+
+  try {
+    const re = new RegExp('^' + escaped + '$');
+    return re.test(filePath);
+  } catch {
+    return false; // malformed pattern — fail safe (allow the action)
+  }
 }
 
 main();

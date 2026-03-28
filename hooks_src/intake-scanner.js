@@ -11,6 +11,22 @@ const fs = require('fs');
 const path = require('path');
 const health = require('./harness-health-util');
 
+const CITADEL_UI = process.env.CITADEL_UI === 'true';
+
+function hookOutput(hookName, action, message, data = {}) {
+  if (CITADEL_UI) {
+    process.stdout.write(JSON.stringify({
+      hook: hookName,
+      action,
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    }));
+  } else {
+    process.stdout.write(message);
+  }
+}
+
 const PROJECT_ROOT = health.PROJECT_ROOT;
 const INTAKE_DIR = path.join(PROJECT_ROOT, '.planning', 'intake');
 
@@ -70,7 +86,10 @@ function main() {
 
   lines.push('  Run /do status for details, or /autopilot to process pending items.');
 
-  process.stdout.write(lines.join('\n'));
+  hookOutput('intake-scanner', 'allowed', lines.join('\n'), {
+    pending: pending.map(i => i.file),
+    inProgress: inProgress.map(i => i.file),
+  });
   process.exit(0);
 }
 

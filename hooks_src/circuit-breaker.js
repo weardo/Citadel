@@ -15,6 +15,22 @@ const fs = require('fs');
 const path = require('path');
 const health = require('./harness-health-util');
 
+const CITADEL_UI = process.env.CITADEL_UI === 'true';
+
+function hookOutput(hookName, action, message, data = {}) {
+  if (CITADEL_UI) {
+    process.stdout.write(JSON.stringify({
+      hook: hookName,
+      action,
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    }));
+  } else {
+    process.stdout.write(message);
+  }
+}
+
 const PLUGIN_DATA_DIR = health.PLUGIN_DATA_DIR;
 const STATE_FILE = path.join(PLUGIN_DATA_DIR, 'circuit-breaker-state.json');
 const LEGACY_STATE_FILE = path.join(health.PROJECT_ROOT, '.claude', 'circuit-breaker-state.json');
@@ -100,7 +116,13 @@ function main() {
         );
       }
 
-      process.stdout.write(lines.filter(Boolean).join('\n'));
+      const msg = lines.filter(Boolean).join('\n');
+      hookOutput('circuit-breaker', 'warned', msg, {
+        consecutiveFailures: THRESHOLD,
+        lifetimeTrips,
+        lastFailedTool: toolName,
+        lastError: error || null,
+      });
     }
 
     process.exit(0);

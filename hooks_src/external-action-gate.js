@@ -27,6 +27,22 @@
 
 const health = require('./harness-health-util');
 
+const CITADEL_UI = process.env.CITADEL_UI === 'true';
+
+function hookOutput(hookName, action, message, data = {}) {
+  if (CITADEL_UI) {
+    process.stdout.write(JSON.stringify({
+      hook: hookName,
+      action,
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    }));
+  } else {
+    process.stdout.write(message);
+  }
+}
+
 const BLOCKED_PATTERNS = [
   { regex: /\bgh\s+pr\s+merge\b/, label: 'gh pr merge' },
   { regex: /\bgh\s+pr\s+close\b/, label: 'gh pr close' },
@@ -88,10 +104,11 @@ function run(input) {
   for (const { regex, label } of BLOCKED_PATTERNS) {
     if (regex.test(stripped)) {
       health.logBlock('external-action-gate', 'blocked', `${label}: ${command.slice(0, 200)}`);
-      process.stdout.write(
+      hookOutput('external-action-gate', 'blocked',
         `[external-action-gate] Blocked: "${label}" is an external action. ` +
         `Show the user the exact content and get approval before executing. ` +
-        `Do NOT retry — ask the user first.`
+        `Do NOT retry — ask the user first.`,
+        { label, command: command.slice(0, 200) }
       );
       process.exit(2);
     }

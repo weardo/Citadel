@@ -6,11 +6,13 @@
  * Usage:
  *   node scripts/telemetry-log.cjs --event <type> --agent <name> [--session <id>] [--meta <json>]
  *
- * Events: agent-start, agent-complete, agent-fail, campaign-start, campaign-complete, wave-start, wave-complete
+ * Events: agent-start, agent-complete, agent-fail, campaign-start, campaign-complete,
+ *         wave-start, wave-complete, agent-timeout
  */
 
 const fs = require('fs');
 const path = require('path');
+const { SCHEMA_VERSION, validateAgentRunEvent } = require('./telemetry-schema.js');
 
 const PROJECT_ROOT = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const LOG_FILE = path.join(PROJECT_ROOT, '.planning', 'telemetry', 'agent-runs.jsonl');
@@ -42,6 +44,7 @@ function main() {
   }
 
   const entry = {
+    schema: SCHEMA_VERSION,
     timestamp: new Date().toISOString(),
     event: args.event,
     agent: args.agent || 'unknown',
@@ -50,6 +53,11 @@ function main() {
     status: args.status || null,
     meta: args.meta || null,
   };
+
+  const { valid, errors } = validateAgentRunEvent(entry);
+  if (!valid) {
+    process.stderr.write(`[telemetry-log] WARNING: invalid event schema — ${errors.join('; ')}\n`);
+  }
 
   const dir = path.dirname(LOG_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

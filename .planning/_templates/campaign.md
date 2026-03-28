@@ -1,3 +1,20 @@
+---
+version: 1
+status: active
+started: "{ISO timestamp}"
+direction: "{one-line summary of the original user direction}"
+phase_count: 0
+current_phase: 1
+---
+<!-- FRONTMATTER GUIDE
+  version:       Do not change. Schema version for UI compatibility.
+  status:        Keep in sync with the "Status:" line below. Values: active | completed | parked | failed
+  started:       Set once at creation. ISO timestamp.
+  direction:     Single-line summary of the campaign goal. No newlines.
+  phase_count:   Update when adding phases. Count of rows in the Phases table.
+  current_phase: Update as phases advance. Matches the phase number currently in-progress.
+-->
+
 # Campaign: {Campaign Name}
 
 Status: active
@@ -67,10 +84,16 @@ Direction: {The original user direction that created this campaign}
 
 ## Active Context
 <!-- Where the campaign is RIGHT NOW. Updated on every session. -->
+<!-- When updating Status or advancing phases, keep frontmatter fields in sync:
+     - status mirrors the "Status:" line above
+     - current_phase mirrors the active phase number
+     - phase_count mirrors the row count in the Phases table
+-->
 Campaign just created. Starting with Phase 1 (Research).
 
 ## Continuation State
 <!-- Machine-readable state for the next Archon invocation. -->
+<!-- Also update frontmatter: status, current_phase when these change. -->
 Phase: 1
 Sub-step: not started
 Files modified: (none yet)

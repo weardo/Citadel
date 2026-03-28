@@ -169,6 +169,48 @@ function countJsonlLines(sandbox, relPath) {
   return fs.readFileSync(full, 'utf8').split('\n').filter(Boolean).length;
 }
 
+// ── Campaign helpers ───────────────────────────────────────────────────────────
+
+/** Extract YAML frontmatter from a markdown string. Returns {} if none found. */
+function parseFrontmatter(content) {
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return {};
+  const result = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) {
+      const val = kv[2].trim().replace(/^["']|["']$/g, '');
+      result[kv[1]] = isNaN(val) ? val : Number(val);
+    }
+  }
+  return result;
+}
+
+function makeCampaignFile(name, status = 'active', phaseCount = 3, currentPhase = 1) {
+  return [
+    '---',
+    'version: 1',
+    `status: ${status}`,
+    `started: "${new Date().toISOString()}"`,
+    `direction: "Test campaign ${name}"`,
+    `phase_count: ${phaseCount}`,
+    `current_phase: ${currentPhase}`,
+    '---',
+    '',
+    `# Campaign: ${name}`,
+    '',
+    `Status: ${status}`,
+    '',
+    '## Claimed Scope',
+    '- src/',
+    '',
+    '## Phases',
+    '| # | Status | Type | Phase | Done When |',
+    '|---|--------|------|-------|-----------|',
+    ...Array.from({ length: phaseCount }, (_, i) => `| ${i+1} | ${i === currentPhase-1 ? 'in-progress' : 'pending'} | build | Phase ${i+1} | done |`),
+  ].join('\n');
+}
+
 // ── Test runner ────────────────────────────────────────────────────────────────
 
 const results = [];
@@ -377,6 +419,140 @@ sequence('3-step write/edit/read sequence: all hooks fire, telemetry consistent'
 
   if (timingAfter <= timingBefore) return 'hook-timing.jsonl did not grow across 3-step sequence';
   if (auditAfter <= auditBefore + 1) return `audit.jsonl grew by ${auditAfter - auditBefore} — expected at least 2 entries (Write + Edit)`;
+}, sandbox);
+
+console.log('\n── Campaign lifecycle ──');
+
+sequence('Campaign file with YAML frontmatter is readable', (sb) => {
+  const campaignsDir = path.join(sb, '.planning', 'campaigns');
+  fs.mkdirSync(campaignsDir, { recursive: true });
+  const filePath = path.join(campaignsDir, 'fm-test.md');
+  const content = makeCampaignFile('fm-test', 'active', 3, 1);
+  fs.writeFileSync(filePath, content);
+
+  const read = fs.readFileSync(filePath, 'utf8');
+  const fm = parseFrontmatter(read);
+  fs.rmSync(filePath);
+
+  if (fm.version !== 1) return `expected version === 1, got: ${fm.version}`;
+  if (fm.status !== 'active') return `expected status === 'active', got: ${fm.status}`;
+  if (typeof fm.phase_count !== 'number') return `expected phase_count to be a number, got: ${typeof fm.phase_count}`;
+}, sandbox);
+
+sequence('Campaign status advancement: frontmatter + body in sync', (sb) => {
+  const campaignsDir = path.join(sb, '.planning', 'campaigns');
+  fs.mkdirSync(campaignsDir, { recursive: true });
+  const filePath = path.join(campaignsDir, 'advance-test.md');
+  const content = makeCampaignFile('advance-test', 'active', 2, 1);
+  fs.writeFileSync(filePath, content);
+
+  // Simulate advancing: update both frontmatter status and body Status line
+  let text = fs.readFileSync(filePath, 'utf8');
+  text = text.replace(/^(status:\s*)active$/m, '$1completed');
+  text = text.replace(/^(Status:\s*)active$/m, '$1completed');
+  fs.writeFileSync(filePath, text);
+
+  const updated = fs.readFileSync(filePath, 'utf8');
+  const fm = parseFrontmatter(updated);
+  const bodyMatch = updated.match(/^Status:\s*(\S+)$/m);
+  fs.rmSync(filePath);
+
+  if (fm.status !== 'completed') return `expected frontmatter status === 'completed', got: ${fm.status}`;
+  if (!bodyMatch || bodyMatch[1] !== 'completed') return `expected body Status: completed, got: ${bodyMatch ? bodyMatch[1] : 'not found'}`;
+}, sandbox);
+
+sequence('Campaign archive: move to completed/ directory', (sb) => {
+  const campaignsDir = path.join(sb, '.planning', 'campaigns');
+  const completedDir = path.join(campaignsDir, 'completed');
+  fs.mkdirSync(completedDir, { recursive: true });
+
+  const srcPath = path.join(campaignsDir, 'lifecycle-test.md');
+  const dstPath = path.join(completedDir, 'lifecycle-test.md');
+
+  // Write active campaign then advance to completed before archiving
+  let content = makeCampaignFile('lifecycle-test', 'active', 2, 1);
+  content = content.replace(/^(status:\s*)active$/m, '$1completed');
+  content = content.replace(/^(Status:\s*)active$/m, '$1completed');
+  fs.writeFileSync(srcPath, content);
+
+  // Simulate archive: rename to completed/
+  fs.renameSync(srcPath, dstPath);
+
+  if (fs.existsSync(srcPath)) return 'source file still exists after archive';
+  if (!fs.existsSync(dstPath)) return 'destination file does not exist after archive';
+
+  const archived = fs.readFileSync(dstPath, 'utf8');
+  const fm = parseFrontmatter(archived);
+  fs.rmSync(dstPath);
+
+  if (fm.status !== 'completed') return `expected archived frontmatter status === 'completed', got: ${fm.status}`;
+}, sandbox);
+
+sequence('protect-files glob: src/** blocks recursive match, non-matching path allowed', (sb) => {
+  // Write a harness.json with src/** as a protected pattern
+  const harnessPath = path.join(sb, '.claude', 'harness.json');
+  const config = { protectedFiles: ['.claude/harness.json', 'src/**'] };
+  fs.writeFileSync(harnessPath, JSON.stringify(config, null, 2));
+
+  // Create the deeply nested file so its directory exists
+  const deepFile = path.join(sb, 'src', 'deeply', 'nested', 'file.ts');
+  fs.mkdirSync(path.dirname(deepFile), { recursive: true });
+  fs.writeFileSync(deepFile, '');
+
+  // src/deeply/nested/file.ts should be blocked
+  const pre1 = preToolUse(sb, 'Edit', { file_path: deepFile });
+  if (!pre1.blocked) return `expected src/deeply/nested/file.ts to be blocked by src/**`;
+
+  // other/file.ts should NOT be blocked
+  const otherFile = path.join(sb, 'other', 'file.ts');
+  fs.mkdirSync(path.dirname(otherFile), { recursive: true });
+  fs.writeFileSync(otherFile, '');
+  const pre2 = preToolUse(sb, 'Edit', { file_path: otherFile });
+
+  // Restore original harness.json (it is protected by default)
+  fs.writeFileSync(harnessPath, JSON.stringify({ protectedFiles: ['.claude/harness.json'] }, null, 2));
+  fs.rmSync(deepFile);
+  fs.rmSync(otherFile);
+
+  if (pre2.blocked) return `expected other/file.ts NOT to be blocked, but got: ${pre2.blockMessage}`;
+}, sandbox);
+
+sequence('init-project version gate: .citadel/version.txt exists after sandbox init', (sb) => {
+  const versionFile = path.join(sb, '.citadel', 'version.txt');
+  if (!fs.existsSync(versionFile)) {
+    // Graceful skip: version gating is feature-flagged by whether package.json version is present
+    // in the plugin. This is an edge case in CI where the harness has no package.json.
+    const pluginPkg = path.join(CITADEL_ROOT, 'package.json');
+    if (!fs.existsSync(pluginPkg)) {
+      // Skip gracefully
+      return undefined;
+    }
+    return '.citadel/version.txt not found — version gating may not be active';
+  }
+  const version = fs.readFileSync(versionFile, 'utf8').trim();
+  if (!version) return '.citadel/version.txt exists but is empty';
+}, sandbox);
+
+sequence('telemetry-schema: validateAgentRunEvent accepts valid entry and rejects invalid event type', (sb) => {
+  const schema = require(path.join(CITADEL_ROOT, 'scripts', 'telemetry-schema.js'));
+
+  // Valid entry
+  const valid = {
+    timestamp: new Date().toISOString(),
+    event: 'agent-start',
+    agent: 'test-agent',
+    session: 'session-001',
+    duration_ms: null,
+    status: null,
+    meta: null,
+  };
+  const r1 = schema.validateAgentRunEvent(valid);
+  if (!r1.valid) return `expected valid entry to pass, got errors: ${r1.errors.join(', ')}`;
+
+  // Invalid event type
+  const invalid = { ...valid, event: 'not-a-valid-event-type' };
+  const r2 = schema.validateAgentRunEvent(invalid);
+  if (r2.valid) return 'expected invalid event type to fail validation, but got valid: true';
 }, sandbox);
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────

@@ -19,6 +19,22 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const health = require('./harness-health-util');
 
+const CITADEL_UI = process.env.CITADEL_UI === 'true';
+
+function hookOutput(hookName, action, message, data = {}) {
+  if (CITADEL_UI) {
+    process.stdout.write(JSON.stringify({
+      hook: hookName,
+      action,
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    }));
+  } else {
+    process.stdout.write(message);
+  }
+}
+
 // Read stdin for hook context
 let input = '';
 process.stdin.setEncoding('utf-8');
@@ -155,7 +171,7 @@ function run() {
       '',
       'Fix these before finalizing your work.',
     ].join('\n');
-    process.stdout.write(msg);
+    hookOutput('quality-gate', 'warned', msg, { violations });
   }
 
   process.exit(0);

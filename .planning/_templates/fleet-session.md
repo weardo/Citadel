@@ -1,3 +1,24 @@
+---
+version: 1
+status: active
+started: "{ISO timestamp}"
+direction: "{one-line summary}"
+wave_count: 0
+current_wave: 1
+agents_total: 0
+agents_complete: 0
+---
+<!-- FRONTMATTER GUIDE
+  version:         Do not change. Schema version for UI compatibility.
+  status:          Keep in sync with the "Status:" line below. Values: active | completed | needs-continue | failed
+  started:         Set once at creation. ISO timestamp.
+  direction:       Single-line summary of the fleet session goal. No newlines.
+  wave_count:      Update when adding waves. Total number of waves planned.
+  current_wave:    Update as waves advance. Wave number currently executing.
+  agents_total:    Update when adding agents to the Work Queue. Total agents across all waves.
+  agents_complete: Increment as agents finish. Used for progress tracking.
+-->
+
 # Fleet Session: {Session Name}
 
 Status: active
@@ -18,6 +39,11 @@ Direction: {Original direction}
 <!-- Accumulated discoveries that inform future waves. Example below. -->
 
 ## Continuation State
+<!-- Update frontmatter fields when advancing waves:
+     - current_wave when moving to the next wave
+     - agents_complete as each agent finishes
+     - status when the session ends
+-->
 Next wave: 1
 Blocked items: none
 Context usage: ~100K tokens
