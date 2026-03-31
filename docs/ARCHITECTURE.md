@@ -4,6 +4,9 @@
 
 How the harness works, from intent to execution.
 
+For the runtime-agnostic contract boundary, see
+[`docs/architecture/runtime-contract.md`](architecture/runtime-contract.md).
+
 ## The Orchestration Ladder
 
 ```
