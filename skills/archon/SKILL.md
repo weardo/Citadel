@@ -32,7 +32,6 @@ Do NOT use Archon for:
 - Parallel execution across many domains (use Fleet)
 
 ## Protocol
-
 ### Step 1: WAKE UP
 
 On every invocation:
@@ -49,31 +48,39 @@ On every invocation:
    node .citadel/scripts/telemetry-log.cjs --event campaign-start --agent archon --session {campaign-slug}
    ```
 
-### Step 2: DECOMPOSE (new campaigns only)
+6. **Legacy check**: If resuming a campaign that has NO "Plan:" line in its Work Plan section:
+   - Read the campaign's Phases table
+   - For each phase, create a task in JSON format:
+     - id: "task-{phase-number}", description: phase name
+     - acceptance_criteria: extracted from Phase End Conditions
+     - depends_on: previous phase's task id (sequential chain)
+     - target_files: extracted from phase scope (if stated in Claimed Scope)
+   - Write to `.planning/plans/{slug}.json`
+   - Add "Plan: .planning/plans/{slug}.json" to campaign's Work Plan section
+   - Log: "Converted legacy campaign to task-level plan"
 
-Break the direction into 3-8 phases:
+### Step 2: PLAN (new campaigns only)
 
-1. Analyze the scope: which files, directories, and systems are involved?
-2. Identify dependencies: what must happen before what?
-3. Create phases in order:
+Delegate planning to /architect (which runs the adversarial pipeline):
 
-| Phase Type | Purpose | Typical Delegation |
-|---|---|---|
-| research | Understand before building | Marshal assess mode |
-| plan | Make architecture decisions | Marshal + review |
-| build | Write code | Marshal → sub-agents |
-| wire | Connect systems together | Marshal with specific targets |
-| verify | Confirm everything works | Typecheck, tests, manual review |
-| prune | Remove dead code, clean up | Marshal with removal targets |
+1. Determine input for /architect:
+   - If direction references a spec (`.planning/specs/*.md`): pass spec path
+   - If direction is a prompt: pass prompt text
+2. Invoke the /architect skill with the input
+   - /architect runs the full pipeline: architect→adversary→refiner→validator
+   - /architect produces `.planning/plans/{slug}.json` AND `.planning/campaigns/{slug}.md`
+3. Read the produced campaign file
+4. Present plan summary to user:
+   - Phase count, task count per phase, total tasks
+   - Dependency layer count
+   - Estimated sessions (1 session per ~5 tasks)
+5. **HITL gate**: "Plan ready with {N} tasks across {P} phases. Review `.planning/plans/{slug}.json`. Approve to begin execution? [y/approve/modify]"
+   - If modify: user edits the plan file, then re-invokes /archon to continue
+   - If approve: proceed to Step 2.5 (DAEMONIZE?) then Step 3
 
-4. For each phase, write machine-verifiable end conditions:
-   - Every phase MUST have at least one non-manual condition
-   - Use condition types: `file_exists`, `command_passes`, `metric_threshold`, `visual_verify`, `manual`
-   - Examples: "src/auth/middleware.ts exists", "npx tsc --noEmit exits 0", "/dashboard renders components"
-   - Write conditions to the Phase End Conditions table in the campaign file
-   - `manual` type is acceptable for UX/design decisions but must not be the only condition
-5. Write the campaign file to `.planning/campaigns/{slug}.md`
-6. Register a scope claim if `.planning/coordination/` exists
+Note: /architect handles the full adversarial pipeline including adaptive depth,
+adversary critique, refiner fixes, and validator sign-off. Archon does not need
+to re-implement any of that — just invoke the skill and use its output.
 
 ### Step 2.5: DAEMONIZE? (new campaigns with 2+ estimated sessions)
 
@@ -101,59 +108,64 @@ After creating the campaign, if the estimated session count is 2 or more:
 - Campaign has only 1 estimated session
 - A daemon is already running (read `.planning/daemon.json`)
 
-### Step 3: EXECUTE PHASES
+### Step 3: EXECUTE TASKS
 
-For each phase:
+Read `.planning/plans/{slug}.json` for the task DAG.
 
-1. **Direction check**: Is this phase still aligned with the campaign goal?
+For each phase in the plan:
 
-1.5. **Create phase checkpoint** (before delegating):
-   ```bash
-   git stash push --include-untracked -m "citadel-checkpoint-{campaign-slug}-phase-{N}"
-   ```
-   - Capture the stash ref from the output (e.g., `stash@{0}`) and write it to the campaign
-     file's Continuation State:
-     ```
-     checkpoint-phase-N: stash@{0}
-     ```
-   - If `git stash` fails (nothing to stash, detached HEAD, clean working tree, etc.):
-     log `checkpoint-phase-N: none` and continue. **Never block on checkpoint failure.**
+1. **Gather phase tasks**: Flatten all tasks across epics/stories in this phase.
+   Filter to tasks with status "pending" or "failed" (skip "complete" and "blocked").
 
-2. **Log delegation start**:
-   ```bash
-   node .citadel/scripts/telemetry-log.cjs --event agent-start --agent {delegate-name} --session {campaign-slug}
-   ```
-3. **Delegate**: Spawn a sub-agent with full context injection:
-   - CLAUDE.md content
-   - `.claude/agent-context/rules-summary.md`
-   - **Map slice** (if `.planning/map/index.json` exists): run
-     `node scripts/map-index.js --query "<phase scope keywords>" --max-files 15`
-     and inject the results. If the index does not exist, skip silently.
-   - Phase-specific direction and scope
-   - Relevant decisions from the campaign's Decision Log
-4. **Verify end conditions**: Before marking a phase complete, check its end conditions:
-   - `file_exists`: check if the file exists on disk
-   - `command_passes`: run the command, verify exit code 0
-   - `metric_threshold`: run the command, parse the output, compare to threshold
-   - `visual_verify`: invoke /live-preview on the specified route
-   - `manual`: log to Review Queue for human verification, don't block
-   - If ANY non-manual condition fails: the phase is NOT complete. Fix what's failing.
-   - Log which conditions passed/failed in the Feature Ledger
-5. **Review**: Read the sub-agent's HANDOFF. Did it accomplish the phase goal?
-5. **Log delegation result**:
-   ```bash
-   node .citadel/scripts/telemetry-log.cjs --event agent-complete --agent {delegate-name} --session {campaign-slug} --status {success|partial|failed}
-   ```
-6. **Record**: Update the campaign file:
-   - Mark the phase complete/partial/failed
-   - Add entries to the Feature Ledger
-   - Log any decisions to the Decision Log
-7. **Self-correct**: Run applicable checks from Step 4:
-   - Quality spot-check (every phase)
-   - Direction alignment (every 2nd phase)
-   - Regression guard (build phases only)
-   - Anti-pattern scan (build phases only)
-8. **Continue**: Move to the next phase
+2. **Group by dependency layers**:
+   - Layer 0: tasks where `depends_on` is empty OR all dependencies have status "complete"
+   - Layer N: tasks whose dependencies are all in layers 0..N-1 and all "complete"
+   - Tasks with unresolvable dependencies (depend on "blocked" tasks): mark as "blocked"
+
+3. **Execute each layer** (sequential between layers, parallel within):
+
+   For each task in the current layer:
+
+   a. **Prepare context**: Read the task's description, acceptance_criteria, steps, target_files.
+      Read CLAUDE.md. Read `.planning/reference/MEMORY.md` and load relevant reference files.
+      Read `references/failure-modes.md` and `references/generator-recovery-protocol.md`.
+      If task has feedback from a previous attempt (`.planning/plans/{slug}-feedback-{task-id}.md`): include it.
+
+   b. **Dispatch generator agent**:
+      - Use Agent tool with the generator agent
+      - If multiple independent tasks in this layer AND no shared target_files: use `isolation: "worktree"` for parallel execution via Fleet
+      - If any two tasks in this layer share a file in `target_files`: run them sequentially (not parallel)
+      - If single task: run in main worktree
+      - Prompt includes: full task context + all references + "You MUST output a HARNESS_STATUS block"
+
+   c. **Parse HARNESS_STATUS** from generator output:
+      - `STATUS: COMPLETE` → proceed to review (step d)
+      - `STATUS: BLOCKED` → mark task "blocked" in plan + campaign, log reason, continue to next task
+      - `STATUS: WORKING` or missing → treat as incomplete, increment attempts, retry if under limit
+
+   d. **Multi-reviewer verification** (for COMPLETE tasks):
+      - Dispatch code-reviewer agent (reads changed files, checks patterns/security/scope)
+      - Run test suite via Bash (`node scripts/run-with-timeout.js 300 <test-command>` or project test command)
+      - If BOTH approve: mark task "complete" in JSON plan + campaign Task Progress table
+      - If EITHER rejects:
+        - Write feedback to `.planning/plans/{slug}-feedback-{task-id}.md`
+        - Increment task.attempts in JSON plan
+        - If attempts < 3: re-dispatch generator with feedback appended to context
+        - If attempts >= 3: mark task "blocked", add to campaign Review Queue for human resolution
+
+   e. **Merge worktrees** if Fleet was used for parallel tasks in this layer:
+      - Before dispatching parallel tasks: check if any two tasks in this layer share a file in `target_files`. If yes, run sequentially instead.
+      - If `git merge` fails on worktree rejoin: (1) log conflict details to `.planning/plans/{slug}-merge-conflict.md`, (2) mark ALL tasks in this layer as "blocked", (3) add to Review Queue for human resolution, (4) do NOT proceed to next layer.
+
+   f. **Update state**:
+      - Update task statuses in `.planning/plans/{slug}.json` (status, attempts)
+      - Update campaign.md Task Progress table
+      - Compress task outputs to ~500-token discovery briefs
+      - Append briefs to campaign.md § Discoveries section
+
+4. **Run Step 4 checks** (direction alignment, quality spot-check, regression guard)
+
+5. **Phase complete** when all layers done and all tasks are "complete" or "blocked"
 
 ### Step 4: SELF-CORRECTION (Mandatory)
 
@@ -232,6 +244,16 @@ If you're running low on context or finishing a session:
    - Any blocking issues
    - What should happen next
 3. The next Archon invocation will read this and pick up where you left off
+
+Include task-level position in the Continuation State:
+```
+Current-plan: .planning/plans/{slug}.json
+Current-phase: {phase-id}
+Current-layer: {layer-number}
+Last-completed-task: {task-id}
+Tasks-complete: {N}/{total}
+Tasks-blocked: {N}
+```
 
 ### Step 7: COMPLETION
 

@@ -1,243 +1,179 @@
 ---
 name: architect
 description: >-
-  Given a PRD, produces an implementation architecture: file tree, component
-  breakdown, data model, and a phased build plan with end conditions that
-  Archon can execute directly. Multi-candidate evaluation for key decisions.
+  Produce adversarially-reviewed implementation plans from specs or prompts.
+  Dispatches architect→adversary→refiner→validator pipeline with adaptive depth
+  based on plan complexity. Outputs JSON work plan + Archon-executable campaign.
 user-invocable: true
 auto-trigger: false
 effort: high
 ---
 
-# /architect — Implementation Architecture from PRD
+# /architect — Adversarial Work Plan Design
 
 ## Identity
 
-/architect converts a PRD into a buildable plan. It decides HOW to implement
-what the PRD describes. Its output is a campaign-ready architecture document
-that Archon reads and executes.
+You are the architect orchestrator. You take a spec or prompt, analyze the codebase,
+and produce a structured work plan that has been adversarially reviewed for correctness.
+You do not write code — you produce the plan that generators execute.
+
+Your pipeline dispatches 4 specialized agents in sequence:
+1. **architect agent** — designs the hierarchical task DAG
+2. **adversary agent** — attacks the plan for conflicts, gaps, and AI failure modes
+3. **refiner agent** — fixes every issue the adversary found
+4. **validator agent** — final release gate (DAG validity, spec coverage, sign-off)
 
 ## When to Use
 
-- After /prd produces an approved PRD (greenfield or feature mode)
-- When the user has a clear direction + existing codebase (no PRD needed)
-- When /do routes a build request
-- When the user has a spec and wants a build plan
+- After `/specify` produces a spec (preferred — structured input produces better plans)
+- After `/prd` produces an approved PRD
+- When the user has a clear direction + existing codebase (no spec needed)
+- When `/do` or `/archon` routes a planning request
 
 ## Inputs
 
-One of:
-1. A PRD file path (from /prd) — preferred, contains structured requirements
-2. A user-provided spec or description + an existing codebase — sufficient
-3. Neither — suggest /prd first, but don't hard-gate. If the user has a clear
-   direction ("add auth to my app"), that + the existing code IS the input.
+One of (checked in this order):
+1. A spec file path (`.planning/specs/*.md`) — preferred, contains structured requirements
+2. A PRD file path (`.planning/prd-*.md`) — contains features + technical decisions
+3. A user-provided description + existing codebase — sufficient for smaller features
 
 ## Mode Detection
 
-**Greenfield mode**: PRD exists with `Mode: greenfield`, or no existing source files.
+**Greenfield mode**: No existing source files, or PRD specifies `Mode: greenfield`.
 Produces a complete architecture from scratch.
 
-**Feature mode**: PRD exists with `Mode: feature`, OR the user describes a feature
-and the project has existing source files. The architecture describes changes to
-existing code, not a standalone system.
-
-In feature mode:
-- Read the existing file tree FIRST — understand the current architecture before planning changes
+**Feature mode**: Existing source files present, or PRD specifies `Mode: feature`.
+- Read the existing file tree FIRST — understand current architecture before planning
 - Read key files (package.json, tsconfig, main entry points, existing patterns)
-- The File Tree section shows ONLY new and modified files, not the entire project
-- Phases include a Phase 0: "Baseline" that records current typecheck/test state
-- Every phase's end conditions include "no new typecheck errors" and "existing tests pass"
-- The Risk Register includes "regression in existing functionality" as a default risk
+- Phase 0 must record baseline typecheck/test state
+- Risk Register includes "regression in existing functionality" as default risk
 
 ## Protocol
 
-### Step 1: READ
+### Step 1: INPUT RESOLUTION
 
-**If PRD exists**, read it. Extract:
-- Core features (the numbered list)
-- Technical decisions (stack choices)
-- End conditions (what "done" looks like)
-- Out of scope (what NOT to build)
-- Integration points (feature mode)
+1. Check if a spec path was provided as argument → read it
+2. If no argument, check `.planning/specs/` for recent specs → ask user which one
+3. If no spec, check `.planning/prd-*.md` for recent PRDs → use it
+4. If nothing, use the user's prompt as the feature description
+5. Read `CLAUDE.md` for project architecture and conventions
+6. Read `.planning/reference/MEMORY.md` if it exists → load relevant reference files based on the "Read When" column
 
-**If no PRD**, read the codebase instead:
-- Scan the file tree for structure and conventions
-- Read package.json / equivalent for dependencies and scripts
-- Read the main entry point(s) to understand the architecture
-- Use the user's description as the feature spec
-- Infer end conditions from the description ("add auth" → "protected routes return 401 without token")
+### Step 2: CONTEXT GATHERING
 
-### Step 2: EVALUATE OPTIONS (for non-trivial decisions)
+1. Scan the file tree to understand project structure (use Glob/LS)
+2. Read key config files (package.json, tsconfig, go.mod, pyproject.toml)
+3. Grep for patterns relevant to the feature being planned
+4. If feature mode: read existing implementations that the new feature touches
+5. Note: do NOT read the entire codebase — focus on files relevant to the plan
 
-For any architectural decision where multiple valid approaches exist:
+### Step 3: PLAN (dispatch architect agent)
 
-1. Generate 2-3 candidate approaches
-2. For each candidate, assess:
-   - Complexity to implement (how many files, how many concepts)
-   - Risk (what could go wrong, what's the failure mode)
-   - Maintainability (how easy to modify later)
-   - LLM-friendliness (how well can an agent implement this without confusion)
-3. Pick the winner. Document why in the architecture doc.
+Dispatch the `architect` agent with full context:
+- Spec/PRD content (or prompt)
+- Codebase scan results (file tree, key patterns found)
+- CLAUDE.md content
+- Reference file content (from Step 1)
 
-This is based on AlphaCodium's finding that multi-candidate evaluation
-outperforms single-candidate refinement. Don't commit to the first idea.
+The architect agent outputs a JSON work plan (phase/epic/story/task hierarchy).
 
-Key decisions that warrant multi-candidate evaluation:
-- State management approach
-- API structure (REST vs tRPC vs GraphQL)
-- Auth implementation pattern
-- Database schema design
-- Routing strategy
+Save the draft to `.planning/plans/{slug}-draft.json`.
 
-Simple decisions (file naming, folder structure, CSS approach) don't need this.
-Use the PRD's stack choices and move on.
+Count total tasks in the draft for adaptive depth determination.
 
-### Step 3: PRODUCE
+### Step 4: ADAPTIVE DEPTH
 
-Write to `.planning/architecture-{slug}.md`:
+Based on total task count from Step 3:
 
-```markdown
-# Architecture: {App Name}
+- **≤5 tasks (light):** Skip to Step 6 (validator only)
+- **6-19 tasks (standard):** Run Step 5 once, then Step 6
+- **≥20 tasks (double):** Run Step 5 twice (adversary→refiner→adversary→refiner), then Step 6
 
-> PRD: .planning/prd-{slug}.md
-> Date: {ISO date}
+Log the depth chosen: "Adaptive depth: {light|standard|double} ({N} tasks)"
 
-## File Tree
-{Greenfield: The complete file tree of the finished v1. Every file listed.
-Feature mode: ONLY new and modified files. Prefix modified files with ~.
-Example: ~ src/routes/index.ts (modified), + src/auth/middleware.ts (new)}
+### Step 5: ADVERSARIAL REVIEW (skipped for light plans)
 
-## Component Breakdown
-{For each core feature from the PRD:}
-### Feature: {name}
-- Files: {list of files this feature touches}
-- Dependencies: {what must exist before this can be built}
-- Complexity: {low/medium/high}
+1. **Dispatch adversary agent** with the current draft plan JSON
+   - Input: full JSON plan content
+   - Output: issues JSON (severity/task_id/issue/fix array)
+2. Save issues to `.planning/plans/{slug}-issues.json`
+3. Log issue summary: "{N} critical, {N} warning, {N} suggestion"
+4. **Dispatch refiner agent** with draft plan + issues
+   - Input: full JSON plan + full issues list
+   - Output: refined work plan JSON
+5. Overwrite draft: save refined plan to `.planning/plans/{slug}-draft.json`
 
-## Data Model
-{If the app has a database:}
-### {Entity name}
-- Fields: {name: type}
-- Relationships: {how it connects to other entities}
+For double depth (≥20 tasks): repeat Step 5 a second time on the refined plan.
 
-{If no database: skip this section}
+### Step 6: VALIDATE
 
-## Key Decisions
-{Architecture decisions that were evaluated:}
-### {Decision}: {What was chosen}
-- **Chosen**: {approach} — because {reasoning}
-- **Rejected**: {alternative} — because {why not}
+1. **Dispatch validator agent** with final draft + spec content (if available)
+   - Input: JSON plan + spec content
+   - Output: sign-off JSON (sign_off bool, coverage, DAG validity)
+2. Save to `.planning/plans/{slug}-signoff.json`
+3. **If sign_off is true:** proceed to Step 7
+4. **If sign_off is false AND haven't retried:**
+   - Log validator issues
+   - Loop back to Step 5 (one retry with the validator's issues as adversary input)
+5. **If sign_off is false after retry:**
+   - Present all issues to the user
+   - Ask: "Override and proceed, or abort?"
+   - If override: proceed to Step 7, log override in Decision Log
+   - If abort: exit with issues summary
 
-## Build Phases
-{Ordered phases that Archon will execute. Each phase has:}
+### Step 7: FINALIZE
 
-### Phase 1: {name}
-- **Goal**: {one sentence}
-- **Files**: {files created or modified}
-- **Dependencies**: {what must exist first, or "none"}
-- **End Conditions**:
-  - [ ] {machine-verifiable condition}
-  - [ ] {machine-verifiable condition}
+1. Rename draft to final: `.planning/plans/{slug}.json`
+2. Generate campaign file from the JSON plan:
+   - Each phase becomes a campaign phase with type and end conditions
+   - Tasks become the Task Progress table (Task | Phase | Layer | Status | Attempts | Model | Files)
+   - End conditions derived from task acceptance_criteria
+   - Add standard campaign sections: Claimed Scope, Feature Ledger, Decision Log, Review Queue, Circuit Breakers, Active Context, Continuation State
+   - Add Work Plan section with link to JSON plan
+3. Write campaign to `.planning/campaigns/{slug}.md`
+4. Present summary:
+   - Phase count, task count, dependency layer count
+   - Adversary issues found and resolved (if applicable)
+   - Estimated complexity (low/medium/high based on task count and dependency depth)
+5. Output: "Plan ready. Review `.planning/plans/{slug}.json`. Run `/archon` to execute."
 
-### Phase 2: {name}
-...
-
-## Phase Dependency Graph
-{Which phases depend on which. Simple text format:}
-Phase 1 → Phase 2 → Phase 3
-                  → Phase 4 (parallel with 3)
-Phase 3 + 4 → Phase 5
-
-## Risk Register
-{Top 3 things most likely to go wrong:}
-1. {risk}: {mitigation}
-2. {risk}: {mitigation}
-3. {risk}: {mitigation}
-
-## Deployment Strategy
-{If the PRD specifies a deployment target. Skip if "deploy later" or static-only.}
-- **Platform**: {from PRD Technical Decisions — see .planning/_templates/deploy/}
-- **Method**: {deployment command}
-- **Environment variables**: {list required env vars, reference .env.example}
-- **Pre-deploy checks**: {typecheck, test, build all pass}
-
-{The final build phase should be "Deploy" when a platform is specified:}
-### Phase N (Final): Deploy
-- **Goal**: Deploy the verified app to {platform}
-- **Dependencies**: All previous phases complete and verified
-- **End Conditions**:
-  - [ ] App deployed successfully (no build errors)
-  - [ ] Production URL accessible and returns expected content
-
-{A failed deploy does NOT fail the campaign. The app works locally. Deploy is bonus.
-If the user says "don't deploy" or "I'll deploy later", omit this phase entirely.}
-```
-
-### Step 4: CONNECT TO CAMPAIGN
-
-Convert the architecture into a campaign-ready format:
-
-1. Each build phase becomes a campaign phase
-2. End conditions from the architecture become Phase End Conditions in the campaign
-3. The dependency graph determines phase ordering
-4. Parallel-safe phases get flagged for potential Fleet execution
-
-Present the architecture summary to the user:
-- File count and structure
-- Number of phases
-- Key decisions made and why
-- Estimated complexity
-
-Ask: "Ready to build? This will create an Archon campaign."
-
-If approved: write the campaign file using the architecture as the direction.
-
-### Step 5: HANDOFF
-
-```
----HANDOFF---
-- Architecture: {app name}
-- Document: .planning/architecture-{slug}.md
-- Phases: {count}
-- Estimated complexity: {low/medium/high}
-- Next: Archon campaign ready to execute
----
-```
-
-## What /architect Does NOT Do
-
-- Build anything (produces the plan, not the code)
-- Skip multi-candidate evaluation for key decisions
-- Create phases without end conditions
-- Ignore the PRD's "out of scope" section
-- Produce a file tree without knowing what each file does
-
-## Quality Gates
-
-- Every phase has at least one machine-verifiable end condition
-- Every key decision documents what was rejected and why
-- File tree is complete (no "etc." or "..." placeholders)
-- Phase dependencies are explicit (no implicit ordering)
-- Risk register has at least 2 entries
-
-## Fringe Cases
-
-**No PRD exists**: Treat the user's description + the existing codebase as the spec. Read the file tree and package.json to infer context. Proceed without requiring a PRD — see "If no PRD" in Step 1.
-
-**Project already has code**: Use feature mode. Read the existing architecture first. The file tree shows only new/modified files. Phase 0 must record the baseline typecheck and test state.
-
-**Vague description**: If the user's description is too vague to produce verifiable end conditions, ask at most 2 clarifying questions before proceeding. Don't block on perfect clarity.
-
-**If .planning/ does not exist**: Create it before writing the architecture document. If creation is not possible, present the architecture document inline and instruct the user to save it.
+### Step 8: HANDOFF
 
 ## Exit Protocol
 
 ```
 ---HANDOFF---
-- Architecture: {app name}
-- Document: .planning/architecture-{slug}.md
-- Phases: {count}
-- Estimated complexity: {low/medium/high}
-- Next: Archon campaign ready to execute
+- Plan: .planning/plans/{slug}.json
+- Campaign: .planning/campaigns/{slug}.md
+- Tasks: {N} across {P} phases
+- Depth: {light|standard|double}
+- Adversary issues: {N} found, {N} resolved
+- Next: /archon to execute, or review the plan first
 ---
 ```
+
+## Quality Gates
+
+- Every plan must pass validator sign_off (or explicit user override with logged rationale)
+- Adversarial review is mandatory for plans with 6+ tasks
+- Every task in the plan must have `target_files` and at least 3 `acceptance_criteria`
+- No cycles in dependency DAG
+- No two tasks sharing a `target_files` entry without dependency chaining
+- JSON plan must be valid and parseable
+
+## Fringe Cases
+
+- **Adversary finds 0 issues**: Proceed — the plan may be genuinely clean. Log "Adversary: 0 issues (clean plan)".
+- **Validator sign_off false after retry + user override**: Log to Decision Log in campaign with full reasoning.
+- **Agent fails to produce valid JSON**: Retry the agent once with explicit instruction to output only JSON. If still invalid, present raw output for manual fix.
+- **No spec and no PRD**: Use prompt + codebase scan. The plan will be less precise but still valid.
+- **Spec references files that don't exist**: Note as a warning in the plan, don't block.
+- **`.planning/` does not exist**: Create it before writing files.
+
+## What /architect Does NOT Do
+
+- Write code (produces the plan, not the implementation)
+- Skip adversarial review for plans with 6+ tasks
+- Produce plans without target_files per task
+- Produce plans without machine-verifiable acceptance criteria
+- Ignore existing codebase patterns in feature mode

@@ -62,6 +62,20 @@ Direction: {The original user direction that created this campaign}
 | 3 | manual | User confirms auth flow works end-to-end |
 -->
 
+
+## Work Plan
+<!-- Linked JSON plan. Created by /architect, read by Archon Step 3. -->
+Plan: .planning/plans/{slug}.json
+Spec: .planning/specs/{slug}.md
+Tasks: {N} total (0 complete, 0 in-progress, {N} pending)
+Current Phase: phase-0
+Current Layer: 0
+
+## Task Progress
+<!-- Updated by Archon after each task execution. -->
+| Task | Phase | Layer | Status | Attempts | Model | Files |
+|------|-------|-------|--------|----------|-------|-------|
+
 ## Feature Ledger
 <!-- Track what was actually built. Updated after each phase. -->
 | Feature | Status | Phase | Notes |

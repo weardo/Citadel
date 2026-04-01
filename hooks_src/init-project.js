@@ -30,6 +30,9 @@ const PLANNING_DIRS = [
   '.planning/research',
   '.planning/screenshots',
   '.planning/telemetry',
+  '.planning/plans',
+  '.planning/specs',
+  '.planning/reference',
 ];
 
 function shouldSyncScripts() {
@@ -126,8 +129,36 @@ function main() {
     const intakeTemplate = path.join(PROJECT_ROOT, '.planning', 'intake', '_TEMPLATE.md');
     const pluginIntakeTemplate = path.join(PLUGIN_ROOT, '.planning', 'intake', '_TEMPLATE.md');
     if (!fs.existsSync(intakeTemplate) && fs.existsSync(pluginIntakeTemplate)) {
-      fs.copyFileSync(pluginIntakeTemplate, intakeTemplate);
+
+    // 3b. Scaffold spec templates if not present
+    const specsDir = path.join(PROJECT_ROOT, '.planning', 'specs');
+    const specsTemplate = path.join(PLUGIN_ROOT, '.planning', '_templates', 'specs-scaffold');
+    if (fs.existsSync(specsTemplate)) {
+      for (const file of ['TEMPLATE.md', 'INDEX.md']) {
+        const dest = path.join(specsDir, file);
+        const src = path.join(specsTemplate, file);
+        if (!fs.existsSync(dest) && fs.existsSync(src)) {
+          fs.copyFileSync(src, dest);
+        }
+      }
     }
+
+    // 3c. Scaffold reference templates if not present
+    const refDir = path.join(PROJECT_ROOT, '.planning', 'reference');
+    const refTemplate = path.join(PLUGIN_ROOT, '.planning', '_templates', 'reference-scaffold');
+    if (fs.existsSync(refTemplate)) {
+      for (const file of ['MEMORY.md', 'session-learnings.md', 'feature-dev-standards.md']) {
+        const dest = path.join(refDir, file);
+        const src = path.join(refTemplate, file);
+        if (!fs.existsSync(dest) && fs.existsSync(src)) {
+          fs.copyFileSync(src, dest);
+        }
+      }
+    }
+      fs.copyFileSync(pluginIntakeTemplate, intakeTemplate);
+
+    }
+
 
     // 4. Sync utility scripts to .citadel/scripts/ (version-gated to avoid unnecessary I/O)
     if (shouldSyncScripts()) {
